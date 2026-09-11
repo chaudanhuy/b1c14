@@ -68,12 +68,39 @@ function createSubmissionCard(item) {
   imageButton.className = 'evidence-button';
   imageButton.setAttribute('aria-label', `Xem ảnh của ${item.name}`);
 
+  const imageWrap = document.createElement('div');
+  imageWrap.className = 'evidence-image-wrap';
+
   const image = document.createElement('img');
   image.loading = 'lazy';
   image.alt = `Minh chứng của ${item.name}`;
   image.src = `/api/admin/image?id=${encodeURIComponent(item.id)}&v=${encodeURIComponent(item.updated_at || '')}`;
-  imageButton.appendChild(image);
+
+  const hint = document.createElement('span');
+  hint.className = 'image-zoom-hint';
+  hint.textContent = 'Bấm để xem toàn màn hình';
+
+  const errorBox = document.createElement('div');
+  errorBox.className = 'image-load-error hidden';
+  errorBox.innerHTML = '<strong>Không tải được ảnh minh chứng</strong><span>Kiểm tra R2 binding <code>UPLOADS</code>, rồi nộp lại ảnh nếu cần.</span>';
+
+  let imageReady = false;
+  image.addEventListener('load', () => {
+    imageReady = true;
+    image.hidden = false;
+    errorBox.classList.add('hidden');
+  });
+  image.addEventListener('error', () => {
+    imageReady = false;
+    image.hidden = true;
+    errorBox.classList.remove('hidden');
+    hint.classList.add('hidden');
+  });
+
+  imageWrap.append(image, errorBox, hint);
+  imageButton.appendChild(imageWrap);
   imageButton.addEventListener('click', () => {
+    if (!imageReady) return;
     dialogImage.src = image.src;
     dialogCaption.textContent = `${item.name} · Tiểu đội ${item.squad} · ${formatTime(item.updated_at)}`;
     imageDialog.showModal();
