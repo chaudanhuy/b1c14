@@ -138,19 +138,10 @@ function createPersonCard(item) {
 
   const preview = document.createElement('div');
   preview.className = 'person-preview';
-  if (item.preview_image_id) {
-    const img = document.createElement('img');
-    img.loading = 'lazy';
-    img.src = `/api/admin/image?id=${encodeURIComponent(item.preview_image_id)}&v=${encodeURIComponent(item.updated_at || '')}`;
-    img.alt = `Ảnh đầu tiên của ${item.name}`;
-    img.addEventListener('error', () => {
-      img.remove();
-      preview.textContent = 'Ảnh';
-    });
-    preview.appendChild(img);
-  } else {
-    preview.textContent = 'Ảnh';
-  }
+  preview.textContent = '🖼';
+  preview.title = 'Ảnh chỉ được tải khi mở hồ sơ';
+  preview.style.fontSize = '24px';
+  preview.style.background = 'linear-gradient(145deg, rgba(79,140,255,.13), rgba(110,107,255,.06))';
 
   const info = document.createElement('div');
   info.className = 'person-info';
@@ -276,6 +267,23 @@ async function openGallery(item) {
   }
 }
 
+function galleryImageUrl(image) {
+  return `/api/admin/image?id=${encodeURIComponent(image.id)}&v=${encodeURIComponent(image.created_at || '')}`;
+}
+
+function preloadGalleryNeighbors() {
+  if (currentGalleryImages.length < 2) return;
+  const candidates = [currentImageIndex + 1, currentImageIndex - 1]
+    .filter(index => index >= 0 && index < currentGalleryImages.length);
+
+  for (const index of candidates) {
+    const image = currentGalleryImages[index];
+    const preload = new Image();
+    preload.decoding = 'async';
+    preload.src = galleryImageUrl(image);
+  }
+}
+
 function renderGallery() {
   galleryThumbs.replaceChildren();
   if (!currentGalleryImages.length) {
@@ -287,28 +295,36 @@ function renderGallery() {
 
   currentImageIndex = Math.min(currentImageIndex, currentGalleryImages.length - 1);
   const current = currentGalleryImages[currentImageIndex];
-  galleryMainImage.src = `/api/admin/image?id=${encodeURIComponent(current.id)}&v=${encodeURIComponent(current.created_at || '')}`;
+  galleryMainImage.decoding = 'async';
+  galleryMainImage.fetchPriority = 'high';
+  galleryMainImage.src = galleryImageUrl(current);
   galleryMainImage.alt = current.image_name || `Ảnh ${currentImageIndex + 1}`;
+  galleryMeta.textContent = `Tiểu đội ${currentGallerySubmission?.squad || ''} · ảnh ${currentImageIndex + 1}/${currentGalleryImages.length}`;
   deleteCurrentImage.disabled = false;
 
   currentGalleryImages.forEach((image, index) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `gallery-thumb ${index === currentImageIndex ? 'active' : ''}`;
-    const img = document.createElement('img');
-    img.loading = 'lazy';
-    img.src = `/api/admin/image?id=${encodeURIComponent(image.id)}&v=${encodeURIComponent(image.created_at || '')}`;
-    img.alt = image.image_name || `Ảnh ${index + 1}`;
-    const label = document.createElement('span');
-    label.textContent = `${index + 1}`;
-    button.append(img, label);
+    button.textContent = `${index + 1}`;
+    button.style.aspectRatio = 'auto';
+    button.style.minWidth = '44px';
+    button.style.height = '40px';
+    button.style.padding = '0 12px';
+    button.style.display = 'inline-grid';
+    button.style.placeItems = 'center';
+    button.title = image.image_name || `Ảnh ${index + 1}`;
+    button.setAttribute('aria-label', `Xem ảnh ${index + 1}`);
     button.addEventListener('click', () => {
+      if (index === currentImageIndex) return;
       currentImageIndex = index;
       renderGallery();
     });
     galleryThumbs.appendChild(button);
   });
 }
+
+galleryMainImage.addEventListener('load', preloadGalleryNeighbors);
 
 async function deleteSubmission(item) {
   const ok = confirm(`Xóa toàn bộ ${item.image_count} ảnh của ${item.name} trong task này?`);
