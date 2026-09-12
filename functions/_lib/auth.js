@@ -66,7 +66,7 @@ export async function createSession(member, env, hours = 24 * 14) {
   const payload = {
     member_id: Number(member.id),
     unit_code: member.unit_code,
-    role: member.unit_code === 'cadre' ? 'cadre' : 'member',
+    role: Number(member.can_manage) === 1 ? 'cadre' : 'member',
     exp: Math.floor(Date.now() / 1000) + (hours * 60 * 60)
   };
   const body = bytesToBase64Url(encoder.encode(JSON.stringify(payload)));
@@ -105,7 +105,15 @@ export async function getAuthenticatedMember(request, env) {
   const payload = await getSessionPayload(request, env);
   if (!payload) return null;
   const member = await env.DB.prepare(`
-    SELECT id, unit_code, unit_label, name, name_key, is_default_password, updated_at
+    SELECT
+      id,
+      unit_code,
+      unit_label,
+      name,
+      name_key,
+      is_default_password,
+      can_manage,
+      updated_at
     FROM members
     WHERE id = ?
     LIMIT 1
@@ -113,7 +121,7 @@ export async function getAuthenticatedMember(request, env) {
   if (!member) return null;
   return {
     ...member,
-    role: member.unit_code === 'cadre' ? 'cadre' : 'member'
+    role: Number(member.can_manage) === 1 ? 'cadre' : 'member'
   };
 }
 

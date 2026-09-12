@@ -19,7 +19,15 @@ export async function onRequestPost({ request, env }) {
   }
 
   const member = await env.DB.prepare(`
-    SELECT id, unit_code, unit_label, name, password_salt, password_hash, is_default_password
+  SELECT
+    id,
+    unit_code,
+    unit_label,
+    name,
+    password_salt,
+    password_hash,
+    is_default_password,
+    can_manage
     FROM members WHERE id = ? LIMIT 1
   `).bind(memberId).first();
 
@@ -40,7 +48,7 @@ export async function onRequestPost({ request, env }) {
       unit_code: member.unit_code,
       unit_label: member.unit_label,
       name: member.name,
-      role: member.unit_code === 'cadre' ? 'cadre' : 'member',
+      role: Number(member.can_manage) === 1 ? 'cadre' : 'member',
       is_default_password: !!member.is_default_password
     }
   }), {

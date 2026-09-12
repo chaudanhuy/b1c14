@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS members (
   password_salt TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   is_default_password INTEGER NOT NULL DEFAULT 1 CHECK (is_default_password IN (0, 1)),
+  can_manage INTEGER NOT NULL DEFAULT 0 CHECK (can_manage IN (0, 1)),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (unit_code, name_key)
@@ -83,3 +84,14 @@ INSERT OR IGNORE INTO members (unit_code, unit_label, display_order, name, name_
 INSERT OR IGNORE INTO members (unit_code, unit_label, display_order, name, name_key, password_salt, password_hash, is_default_password, created_at, updated_at) VALUES ('3','Tiểu đội 3',6,'Lê Minh Thảo','le minh thao','FbpZQvoapjo3s8mE','PwNWMr4Y6pRJUrrEZAt9AmnjjCgc2_Yqfi9A7cSESb4',1,datetime('now'),datetime('now'));
 INSERT OR IGNORE INTO members (unit_code, unit_label, display_order, name, name_key, password_salt, password_hash, is_default_password, created_at, updated_at) VALUES ('3','Tiểu đội 3',7,'Phan Tấn Duy','phan tan duy','caqYkHvJ4cfZAHdj','YhOD5fNP2IA2EI5JzpRGRKlhOCCSAiWRD4toELpRFk0',1,datetime('now'),datetime('now'));
 INSERT OR IGNORE INTO members (unit_code, unit_label, display_order, name, name_key, password_salt, password_hash, is_default_password, created_at, updated_at) VALUES ('3','Tiểu đội 3',8,'Hồ Đình Hoàng Thắng','ho dinh hoang thang','B9nEldHTj1i1Z734','uqeyItDMGhx0IEEP0-wjteyzHe7maHVQ0LwJQowzcGA',1,datetime('now'),datetime('now'));
+
+-- Cấp quyền quản lý cho cán bộ trung đội
+UPDATE members
+SET can_manage = 1
+WHERE unit_code = 'cadre';
+
+-- Châu Đan Huy thuộc Tiểu đội 1 nhưng có quyền quản lý
+UPDATE members
+SET can_manage = 1
+WHERE unit_code = '1'
+  AND name_key = 'chau dan huy';
