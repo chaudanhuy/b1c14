@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Tổng hợp hoạt động</title>
+  <link rel="stylesheet" href="./assets/css/main.css" />
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <header class="site-header container">
+    <a class="brand" href="./index.html" aria-label="Trang nộp minh chứng">
+      <span class="brand-mark">TH</span>
+      <span>
+        <strong>Tổng hợp hoạt động</strong>
+        <small>Nộp minh chứng nhanh · thống kê tự động</small>
+      </span>
+    </a>
+    <a class="admin-link" href="./admin.html">Cán bộ kiểm tra</a>
+  </header>
+
+  <main class="container page-grid">
+    <section class="hero-card panel">
+      <div class="eyebrow">NỘP MINH CHỨNG</div>
+      <h1>Chọn task. Gửi ảnh. Xong.</h1>
+      <p class="lead">Mỗi task có danh sách nộp riêng. Một học viên có thể gửi nhiều ảnh và hệ thống sẽ tự gom chúng vào cùng một lần hiển thị.</p>
+
+      <div class="notice">
+        <span class="notice-icon">i</span>
+        <p>Nếu bạn nộp thêm với <b>cùng task + cùng họ tên + cùng tiểu đội</b>, ảnh mới sẽ được bổ sung vào hồ sơ cũ, không tạo thêm một người trùng tên.</p>
+      </div>
+
+      <form id="submissionForm" class="submission-form" novalidate>
+        <label class="field field-full">
+          <span>Task cần minh chứng</span>
+          <select id="task" name="task_id" required>
+            <option value="">Đang tải danh sách task...</option>
+          </select>
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Tiểu đội</span>
+            <select id="squad" name="squad" required>
+              <option value="">Chọn tiểu đội</option>
+              <option value="1">Tiểu đội 1</option>
+              <option value="2">Tiểu đội 2</option>
+              <option value="3">Tiểu đội 3</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Họ và tên</span>
+            <input id="name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="Ví dụ: Nguyễn Văn A" required />
+          </label>
+        </div>
+
+        <label class="upload-box" id="uploadBox" for="images">
+          <input id="images" name="images" type="file" accept="image/png,image/jpeg,image/webp" multiple required hidden />
+          <div class="upload-icon">↑</div>
+          <div>
+            <strong id="uploadTitle">Chọn một hoặc nhiều ảnh minh chứng</strong>
+            <p id="uploadHint">PNG, JPG hoặc WEBP · tối đa 8 MB/ảnh · tối đa 10 ảnh/lần</p>
+          </div>
+          <button class="ghost-button" type="button" id="chooseFileButton">Chọn ảnh</button>
+        </label>
+
+        <div id="previewWrap" class="multi-preview hidden">
+          <div class="multi-preview-head">
+            <strong id="previewCount">0 ảnh đã chọn</strong>
+            <span id="previewTotalSize"></span>
+          </div>
+          <div id="previewList" class="preview-list"></div>
+        </div>
+
+        <button id="submitButton" class="primary-button" type="submit">
+          <span class="button-label">Gửi minh chứng</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+
+        <div id="formMessage" class="form-message" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <aside class="stats-panel panel">
+      <div class="stats-head">
+        <div>
+          <div class="eyebrow">TIẾN ĐỘ TASK</div>
+          <h2 id="statsTaskTitle">Đã nộp hiện tại</h2>
+        </div>
+        <button id="refreshStats" class="icon-button" type="button" aria-label="Làm mới thống kê">↻</button>
+      </div>
+
+      <div class="total-card">
+        <span>Tổng cả lớp</span>
+        <strong id="totalCount">—</strong>
+        <small>người đã nộp</small>
+      </div>
+
+      <div class="squad-stats">
+        <div class="squad-stat">
+          <span class="squad-dot">1</span>
+          <div><strong>Tiểu đội 1</strong><small>Đã nộp</small></div>
+          <b id="squad1Count">—</b>
+        </div>
+        <div class="squad-stat">
+          <span class="squad-dot">2</span>
+          <div><strong>Tiểu đội 2</strong><small>Đã nộp</small></div>
+          <b id="squad2Count">—</b>
+        </div>
+        <div class="squad-stat">
+          <span class="squad-dot">3</span>
+          <div><strong>Tiểu đội 3</strong><small>Đã nộp</small></div>
+          <b id="squad3Count">—</b>
+        </div>
+      </div>
+
+      <p class="stats-note">Số liệu được tính riêng theo task đang chọn. Chỉ cán bộ mới xem được họ tên và ảnh minh chứng.</p>
+    </aside>
+  </main>
+
+  <footer class="container site-footer">Hệ thống tổng hợp hoạt động · Cloudflare Pages</footer>
+  <script src="./assets/js/app.js" defer></script>
+</body>
+</html>
