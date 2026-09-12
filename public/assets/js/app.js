@@ -57,6 +57,7 @@ const createTaskForm = document.querySelector('#createTaskForm');
 const cadreTaskMessage = document.querySelector('#cadreTaskMessage');
 const refreshCadreButton = document.querySelector('#refreshCadreButton');
 const toggleTaskButton = document.querySelector('#toggleTaskButton');
+const deleteTaskButton = document.querySelector('#deleteTaskButton');
 const exportZipButton = document.querySelector('#exportZipButton');
 const cadreSearchInput = document.querySelector('#cadreSearchInput');
 const cadreSections = document.querySelector('#cadreSections');
@@ -412,10 +413,12 @@ function updateCadreToggleButton() {
   const task = cadreTasks.find(item => String(item.id) === String(cadreTaskSelect.value));
   if (!task) {
     toggleTaskButton.disabled = true;
+    deleteTaskButton.disabled = true;
     exportZipButton.disabled = true;
     return;
   }
   toggleTaskButton.disabled = false;
+  deleteTaskButton.disabled = false;
   exportZipButton.disabled = false;
   toggleTaskButton.textContent = Number(task.is_active) ? 'Đóng nhận bài' : 'Mở nhận bài';
 }
@@ -734,6 +737,100 @@ toggleTaskButton.addEventListener('click', async () => {
     showMessage(cadreTaskMessage, error.message || 'Không thể đổi trạng thái task.', 'error');
   } finally {
     setButtonLoading(toggleTaskButton, false);
+  }
+});
+
+deleteTaskButton.addEventListener('click', async () => {
+  const task = cadreTasks.find(
+    item => String(item.id) === String(cadreTaskSelect.value)
+  );
+
+  if (!task) return;
+
+  const firstConfirm = confirm(
+    `Xóa task "${task.title}"?\n\n` +
+    `Toàn bộ ảnh minh chứng của tất cả thành viên trong task này ` +
+    `sẽ bị xóa vĩnh viễn khỏi R2.`
+  );
+
+  if (!firstConfirm) return;
+
+  const secondConfirm = confirm(
+    `XÁC NHẬN LẦN CUỐI\n\n` +
+    `Task: ${task.title}\n\n` +
+    `Sau thao tác này không thể khôi phục. Tiếp tục?`
+  );
+
+  if (!secondConfirm) return;
+
+  setButtonLoading(
+    deleteTaskButton,
+    true,
+    'Đang xóa...'
+  );
+
+  showMessage(
+    cadreTaskMessage,
+    'Đang xóa task và toàn bộ ảnh minh chứng...'
+  );
+
+  try {
+    const data = await fetchJSON(
+      `/api/cadre/delete-task?task_id=${encodeURIComponent(task.id)}`,
+      {
+        method: 'DELETE'
+      }
+    );
+
+    showMessage(
+      cadreTaskMessage,
+      `Đã xóa "${data.deleted_task}" và ${data.deleted_images} ảnh.`,
+      'success'
+    );
+
+    // Tải lại danh sách task ở cả khu cá nhân và khu quản lý.
+    await loadTasks(false);
+    await loadTasks(true);
+
+    if (cadreTasks.length) {
+      cadreTaskSelect.value = String(cadreTasks[0].id);
+
+      const firstActive = tasks.find(
+        item => Number(item.is_active) === 1
+      );
+
+      if (firstActive) {
+        taskSelect.value = String(firstActive.id);
+      }
+
+      await loadCadreDashboard();
+      await loadMySubmission();
+
+    } else {
+      cadreSections.innerHTML = `
+        <div class="empty-box">
+          <strong>Chưa có task nào.</strong>
+          <span>Hãy tạo task mới để bắt đầu.</span>
+        </div>
+      `;
+
+      await loadStats(0);
+      updateCadreToggleButton();
+      await loadMySubmission();
+    }
+
+  } catch (error) {
+    showMessage(
+      cadreTaskMessage,
+      error.message || 'Không thể xóa task.',
+      'error'
+    );
+
+  } finally {
+    setButtonLoading(
+      deleteTaskButton,
+      false
+    );
   }
 });
 
