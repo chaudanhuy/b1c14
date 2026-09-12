@@ -203,6 +203,10 @@ function resetAllViews() {
   showMessage(cadreDashboardMessage, '');
 }
 
+function imageUrl(image) {
+  return `/api/image?id=${encodeURIComponent(image.id)}&v=${encodeURIComponent(image.created_at || '')}`;
+}
+
 async function loadRoster() {
   if (IS_LOCAL_FILE) {
     roster = [
@@ -366,7 +370,7 @@ async function loadMySubmission() {
     const card = document.createElement('article');
     card.className = 'my-image-card';
     card.innerHTML = `
-      <img loading="lazy" src="/api/image?id=${encodeURIComponent(image.id)}" alt="${image.image_name || 'Ảnh minh chứng'}">
+      <img loading="lazy" src="${imageUrl(image)}" alt="${image.image_name || 'Ảnh minh chứng'}">
       <div class="my-image-body">
         <strong>${image.image_name || 'Ảnh minh chứng'}</strong>
         <small>${formatBytes(image.image_size || 0)} · ${new Date(image.created_at).toLocaleString('vi-VN')}</small>
@@ -500,7 +504,7 @@ async function openGallery(item) {
 function renderGallery() {
   const current = galleryImages[galleryIndex];
   if (!current) return;
-  galleryMainImage.src = `/api/image?id=${encodeURIComponent(current.id)}`;
+  galleryMainImage.src = imageUrl(current);
   galleryMeta.textContent = `${galleryOwner.unit_label} · ảnh ${galleryIndex + 1}/${galleryImages.length} · ${current.image_name || 'Ảnh minh chứng'}`;
   galleryThumbs.replaceChildren();
   galleryImages.forEach((img, index) => {
@@ -518,7 +522,7 @@ function renderGallery() {
   const next = galleryImages[galleryIndex + 1];
   if (next) {
     const preload = new Image();
-    preload.src = `/api/image?id=${encodeURIComponent(next.id)}`;
+    preload.src = imageUrl(next);
   }
 }
 
