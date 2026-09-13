@@ -1,6 +1,9 @@
+const IS_LOCAL_FILE = window.location.protocol === 'file:';
+
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_FILES = 10;
 const MAX_TOTAL_SIZE = 100 * 1024 * 1024;
+
 
 const ALLOWED_EXTENSIONS = [
   'png',
@@ -277,7 +280,7 @@ function imageUrl(image) {
 async function loadRoster() {
   if (IS_LOCAL_FILE) {
     roster = [
-      { code: 'cadre', label: 'Cán bộ trung đội', members: [{ id: 1, name: 'Vũ Trọng Thắng' }, { id: 2, name: 'Nguyễn Sở Trường' }] },
+      { code: 'cadre', label: 'Cán bộ trung đội', members: [{ id: 1, name: 'Vũ Trọng Thăng' }, { id: 2, name: 'Nguyễn Sở Trường' }] },
       { code: '1', label: 'Tiểu đội 1', members: [{ id: 3, name: 'Châu Đan Huy' }] },
       { code: '2', label: 'Tiểu đội 2', members: [{ id: 4, name: 'Thái Thanh Phong' }] },
       { code: '3', label: 'Tiểu đội 3', members: [{ id: 5, name: 'Trần Hoàng Kiên' }] }
