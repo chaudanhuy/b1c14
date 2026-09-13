@@ -252,3 +252,28 @@ h2 { font-size: 26px; letter-spacing: -.03em; margin: 8px 0 8px; }
   .container { width: min(1220px, calc(100% - 18px)); }
   .gallery-dialog { padding: 18px; }
 }
+
+.cadre-results-panel {
+  margin-top: 24px;
+  padding: 26px;
+}
+
+.stats-wide-grid {
+  margin-bottom: 0;
+}
+
+.cadre-results-panel .toolbar {
+  margin-bottom: 22px;
+}
+
+.cadre-results-panel .filter-tabs {
+  gap: 12px;
+}
+
+.cadre-results-panel .filter-tab {
+  padding: 11px 16px;
+}
+
+.cadre-results-panel .search-box {
+  min-height: 52px;
+}
