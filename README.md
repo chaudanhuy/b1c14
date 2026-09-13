@@ -130,3 +130,4 @@ Ten task/
 - Khuyên mỗi người đổi sớm để tránh người khác biết mật khẩu chung.
 - Server chỉ cho phép xóa ảnh khi ảnh đó thuộc đúng `member_id` đang đăng nhập.
 - Cán bộ chỉ có quyền xem / tổng hợp / xuất file, **không có DELETE API cho admin**.
+deploy trigger
