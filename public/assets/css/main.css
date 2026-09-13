@@ -277,3 +277,29 @@ h2 { font-size: 26px; letter-spacing: -.03em; margin: 8px 0 8px; }
 .cadre-results-panel .search-box {
   min-height: 52px;
 }
+.file-preview-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(108, 99, 255, .10),
+      rgba(75, 139, 255, .08)
+    );
+}
+
+.file-preview-placeholder span {
+  min-width: 72px;
+  padding: 16px 12px;
+  border-radius: 16px;
+  background: white;
+  color: var(--violet);
+  text-align: center;
+  font-weight: 900;
+  font-size: 18px;
+  box-shadow:
+    0 10px 25px
+    rgba(92, 107, 192, .14);
+}

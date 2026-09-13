@@ -1,8 +1,43 @@
-const IS_LOCAL_FILE = window.location.protocol === 'file:';
-const MAX_FILE_SIZE = 8 * 1024 * 1024;
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_FILES = 10;
-const MAX_TOTAL_SIZE = 50 * 1024 * 1024;
-const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_TOTAL_SIZE = 100 * 1024 * 1024;
+
+const ALLOWED_EXTENSIONS = [
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx'
+];
+
+function getFileExtension(name = '') {
+  return String(name)
+    .split('.')
+    .pop()
+    .toLowerCase();
+}
+
+function isImageFile(file) {
+  return String(
+    file.type || ''
+  ).startsWith('image/');
+}
+
+function getFileLabel(file) {
+  const ext =
+    getFileExtension(file.name);
+
+  return (
+    ext.toUpperCase() ||
+    'FILE'
+  );
+}
 
 const unitSelect = document.querySelector('#unitSelect');
 const memberSelect = document.querySelector('#memberSelect');
@@ -111,15 +146,46 @@ function clearPreviewUrls() {
 }
 
 function validateFiles(files) {
-  if (!files.length) return 'Bạn chưa chọn ảnh.';
-  if (files.length > MAX_FILES) return `Mỗi lần chỉ chọn tối đa ${MAX_FILES} ảnh.`;
+  if (!files.length) {
+    return 'Bạn chưa chọn tài liệu.';
+  }
+
+  if (files.length > MAX_FILES) {
+    return `Mỗi lần chỉ chọn tối đa ${MAX_FILES} tài liệu.`;
+  }
+
   let total = 0;
+
   for (const file of files) {
-    if (!ALLOWED_TYPES.includes(file.type)) return `File "${file.name}" không phải PNG/JPG/WEBP.`;
-    if (file.size > MAX_FILE_SIZE) return `Ảnh "${file.name}" vượt quá 8 MB.`;
+    const ext =
+      getFileExtension(file.name);
+
+    if (
+      !ALLOWED_EXTENSIONS.includes(ext)
+    ) {
+      return (
+        `File "${file.name}" ` +
+        `không thuộc định dạng được hỗ trợ.`
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return (
+        `File "${file.name}" ` +
+        `vượt quá 20 MB.`
+      );
+    }
+
     total += file.size;
   }
-  if (total > MAX_TOTAL_SIZE) return 'Tổng dung lượng vượt quá 50 MB.';
+
+  if (total > MAX_TOTAL_SIZE) {
+    return (
+      'Tổng dung lượng tài liệu ' +
+      'vượt quá 100 MB.'
+    );
+  }
+
   return '';
 }
 
@@ -299,68 +365,140 @@ async function loadStats(taskId = Number(taskSelect.value || cadreTaskSelect.val
   cadreCount2.textContent = String(data.counts?.['2'] ?? 0);
   cadreCount3.textContent = String(data.counts?.['3'] ?? 0);
 }
-
 function clearPreviews() {
   clearPreviewUrls();
+
   previewList.replaceChildren();
-  previewWrap.classList.add('hidden');
-  uploadTitle.textContent = 'Chọn một hoặc nhiều ảnh minh chứng';
-  uploadHint.textContent = 'PNG, JPG, WEBP · tối đa 8 MB/ảnh · tối đa 10 ảnh/lần';
+
+  previewWrap.classList.add(
+    'hidden'
+  );
+
+  uploadTitle.textContent =
+    'Gửi tài liệu của bạn tại đây';
+
+  uploadHint.textContent =
+    'Ảnh · PDF · Word · Excel · PowerPoint · tối đa 20 MB/tệp';
 }
 
 function renderSelectedFiles() {
-  const files = [...imagesInput.files];
-  const error = validateFiles(files);
+  const files =
+    [...imagesInput.files];
+
+  const error =
+    validateFiles(files);
+
   clearPreviews();
 
   if (error) {
-    if (files.length) showMessage(uploadMessage, error, 'error');
+    if (files.length) {
+      showMessage(
+        uploadMessage,
+        error,
+        'error'
+      );
+    }
+
     return;
   }
-  if (!files.length) return;
 
-  showMessage(uploadMessage, '');
-  const total = files.reduce((sum, file) => sum + file.size, 0);
-  previewCount.textContent = `${files.length} ảnh đã chọn`;
-  previewSize.textContent = formatBytes(total);
+  if (!files.length) {
+    return;
+  }
+
+  showMessage(
+    uploadMessage,
+    ''
+  );
+
+  const total =
+    files.reduce(
+      (sum, file) =>
+        sum + file.size,
+      0
+    );
+
+  previewCount.textContent =
+    `${files.length} tài liệu đã chọn`;
+
+  previewSize.textContent =
+    formatBytes(total);
 
   for (const file of files) {
-    const url = URL.createObjectURL(file);
-    previewUrls.push(url);
-    const card = document.createElement('div');
-    card.className = 'preview-item';
-    card.innerHTML = `
-      <img src="${url}" alt="${file.name}">
-      <div class="preview-meta">
-        <strong>${file.name}</strong>
-        <small>${formatBytes(file.size)}</small>
-      </div>
-    `;
+    const card =
+      document.createElement('div');
+
+    card.className =
+      'preview-item';
+
+    if (isImageFile(file)) {
+      const url =
+        URL.createObjectURL(file);
+
+      previewUrls.push(url);
+
+      card.innerHTML = `
+        <img
+          src="${url}"
+          alt="${file.name}"
+        >
+
+        <div class="preview-meta">
+          <strong>${file.name}</strong>
+          <small>
+            ${formatBytes(file.size)}
+          </small>
+        </div>
+      `;
+    } else {
+      card.innerHTML = `
+        <div class="file-preview-placeholder">
+          <span>
+            ${getFileLabel(file)}
+          </span>
+        </div>
+
+        <div class="preview-meta">
+          <strong>${file.name}</strong>
+          <small>
+            ${formatBytes(file.size)}
+          </small>
+        </div>
+      `;
+    }
+
     previewList.appendChild(card);
   }
-  uploadTitle.textContent = `${files.length} ảnh đã sẵn sàng`;
-  uploadHint.textContent = 'Có thể chọn lại nếu muốn thay đổi danh sách ảnh.';
-  previewWrap.classList.remove('hidden');
+
+  uploadTitle.textContent =
+    `${files.length} tài liệu đã sẵn sàng`;
+
+  uploadHint.textContent =
+    'Có thể chọn lại nếu muốn thay đổi danh sách tài liệu.';
+
+  previewWrap.classList.remove(
+    'hidden'
+  );
 }
 
 async function loadMySubmission() {
   if (!currentMember) return;
   const taskId = Number(taskSelect.value);
   if (!taskId) {
-    mySubmissionMeta.textContent = 'Chọn task để xem các ảnh bạn đã nộp.';
+    mySubmissionMeta.textContent = 'Chọn task để xem các tài liệu bạn đã nộp.';
     myImagesGrid.className = 'my-images-grid empty-state';
     myImagesGrid.innerHTML = '<div class="empty-box"><strong>Chưa chọn task.</strong><span>Hãy chọn task ở phần trên để xem hồ sơ cá nhân.</span></div>';
     return;
   }
 
-  showMessage(mySubmissionMessage, 'Đang tải hồ sơ ảnh của bạn...');
+  showMessage(mySubmissionMessage, 'Đang tải hồ sơ tài liệu của bạn...');
   const data = await fetchJSON(`/api/me/submission?task_id=${encodeURIComponent(taskId)}`);
   const task = tasks.find(item => Number(item.id) === taskId) || cadreTasks.find(item => Number(item.id) === taskId);
   mySubmissionMeta.textContent = task ? `Task: ${task.title}` : 'Hồ sơ hiện tại';
 
   if (!data.submission || !(data.images || []).length) {
     myImagesGrid.className = 'my-images-grid empty-state';
-    myImagesGrid.innerHTML = '<div class="empty-box"><strong>Chưa có ảnh minh chứng nào trong task này.</strong><span>Khi bạn tải ảnh lên, chúng sẽ xuất hiện tại đây.</span></div>';
+    myImagesGrid.innerHTML = '<div class="empty-box"><strong>Chưa có tài liệu minh chứng nào trong task này.</strong><span>Khi bạn tải tài liệu lên, chúng sẽ xuất hiện tại đây.</span></div>';
     showMessage(mySubmissionMessage, '');
     return;
   }
@@ -371,19 +509,19 @@ async function loadMySubmission() {
     const card = document.createElement('article');
     card.className = 'my-image-card';
     card.innerHTML = `
-      <img loading="lazy" src="${imageUrl(image)}" alt="${image.image_name || 'Ảnh minh chứng'}">
+      <img loading="lazy" src="${imageUrl(image)}" alt="${image.image_name || 'tài liệu minh chứng'}">
       <div class="my-image-body">
-        <strong>${image.image_name || 'Ảnh minh chứng'}</strong>
+        <strong>${image.image_name || 'tài liệu minh chứng'}</strong>
         <small>${formatBytes(image.image_size || 0)} · ${new Date(image.created_at).toLocaleString('vi-VN')}</small>
       </div>
       <div class="my-image-actions">
-        <small>Mã ảnh #${image.id}</small>
-        <button class="delete-button" type="button" data-image-id="${image.id}">Xóa ảnh này</button>
+        <small>Mã tài liệu #${image.id}</small>
+        <button class="delete-button" type="button" data-image-id="${image.id}">Xóa tài liệu này</button>
       </div>
     `;
     myImagesGrid.appendChild(card);
   }
-  showMessage(mySubmissionMessage, `Bạn đang có ${data.images.length} ảnh trong task này.`);
+  showMessage(mySubmissionMessage, `Bạn đang có ${data.images.length} tài liệu trong task này.`);
 }
 
 async function afterLogin() {
@@ -459,7 +597,7 @@ function renderCadreSections() {
     `;
     const grid = card.querySelector('.section-grid');
     if (!items.length) {
-      grid.innerHTML = '<div class="empty-box"><strong>Chưa có bản nộp nào ở nhóm này.</strong><span>Khi có người nộp, tên và số ảnh sẽ hiện ở đây.</span></div>';
+      grid.innerHTML = '<div class="empty-box"><strong>Chưa có bản nộp nào ở nhóm này.</strong><span>Khi có người nộp, tên và số tài liệu sẽ hiện ở đây.</span></div>';
     } else {
       shown += items.length;
       for (const item of items) {
@@ -468,10 +606,10 @@ function renderCadreSections() {
         article.innerHTML = `
           <strong>${item.name}</strong>
           <div class="person-meta">
-            <div>${item.image_count} ảnh minh chứng</div>
+            <div>${item.image_count} tài liệu minh chứng</div>
             <div>Cập nhật: ${new Date(item.updated_at).toLocaleString('vi-VN')}</div>
           </div>
-          <button class="soft-button" type="button">Xem ảnh</button>
+          <button class="soft-button" type="button">Xem tài liệu</button>
         `;
         article.querySelector('button').addEventListener('click', () => openGallery(item));
         grid.appendChild(article);
@@ -488,7 +626,7 @@ function renderCadreSections() {
 async function openGallery(item) {
   galleryOwner = item;
   galleryTitle.textContent = item.name;
-  galleryMeta.textContent = `${item.unit_label} · đang tải ảnh...`;
+  galleryMeta.textContent = `${item.unit_label} · đang tải tài liệu...`;
   galleryThumbs.replaceChildren();
   galleryMainImage.removeAttribute('src');
   galleryDialog.showModal();
@@ -497,7 +635,7 @@ async function openGallery(item) {
   galleryIndex = 0;
 
   if (!galleryImages.length) {
-    galleryMeta.textContent = `${item.unit_label} · chưa có ảnh.`;
+    galleryMeta.textContent = `${item.unit_label} · chưa có tài liệu.`;
     return;
   }
 
@@ -508,7 +646,7 @@ function renderGallery() {
   const current = galleryImages[galleryIndex];
   if (!current) return;
   galleryMainImage.src = imageUrl(current);
-  galleryMeta.textContent = `${galleryOwner.unit_label} · ảnh ${galleryIndex + 1}/${galleryImages.length} · ${current.image_name || 'Ảnh minh chứng'}`;
+  galleryMeta.textContent = `${galleryOwner.unit_label} · tài liệu ${galleryIndex + 1}/${galleryImages.length} · ${current.image_name || 'tài liệu minh chứng'}`;
   galleryThumbs.replaceChildren();
   galleryImages.forEach((img, index) => {
     const button = document.createElement('button');
@@ -621,7 +759,7 @@ uploadForm.addEventListener('submit', async event => {
   body.append('task_id', taskSelect.value);
   files.forEach(file => body.append('images', file));
   setButtonLoading(submitButton, true, 'Đang gửi...');
-  showMessage(uploadMessage, `Đang tải ${files.length} ảnh lên hệ thống...`);
+  showMessage(uploadMessage, `Đang tải ${files.length} tài liệu lên hệ thống...`);
   try {
     const data = await fetchJSON('/api/me/upload', { method: 'POST', body });
     showMessage(uploadMessage, data.message || 'Đã gửi minh chứng.', 'success');
@@ -642,16 +780,16 @@ myImagesGrid.addEventListener('click', async event => {
   if (!button) return;
   const imageId = Number(button.dataset.imageId);
   if (!imageId) return;
-  if (!confirm('Bạn muốn xóa ảnh này khỏi hồ sơ của mình?')) return;
+  if (!confirm('Bạn muốn xóa tài liệu này khỏi hồ sơ của mình?')) return;
   button.disabled = true;
   try {
     const data = await fetchJSON(`/api/me/images?id=${encodeURIComponent(imageId)}`, { method: 'DELETE' });
-    showMessage(mySubmissionMessage, data.remaining === 0 ? 'Đã xóa ảnh cuối cùng trong task này.' : 'Đã xóa ảnh thành công.', 'success');
+    showMessage(mySubmissionMessage, data.remaining === 0 ? 'Đã xóa tài liệu cuối cùng trong task này.' : 'Đã xóa tài liệu thành công.', 'success');
     await loadStats(Number(taskSelect.value));
     await loadMySubmission();
     if (currentMember?.role === 'cadre') await fetchCadreSubmissions();
   } catch (error) {
-    showMessage(mySubmissionMessage, error.message || 'Không thể xóa ảnh.', 'error');
+    showMessage(mySubmissionMessage, error.message || 'Không thể xóa tài liệu.', 'error');
     button.disabled = false;
   }
 });
@@ -749,7 +887,7 @@ deleteTaskButton.addEventListener('click', async () => {
 
   const firstConfirm = confirm(
     `Xóa task "${task.title}"?\n\n` +
-    `Toàn bộ ảnh minh chứng của tất cả thành viên trong task này ` +
+    `Toàn bộ tài liệu minh chứng của tất cả thành viên trong task này ` +
     `sẽ bị xóa vĩnh viễn khỏi R2.`
   );
 
@@ -771,7 +909,7 @@ deleteTaskButton.addEventListener('click', async () => {
 
   showMessage(
     cadreTaskMessage,
-    'Đang xóa task và toàn bộ ảnh minh chứng...'
+    'Đang xóa task và toàn bộ tài liệu minh chứng...'
   );
 
   try {
@@ -784,7 +922,7 @@ deleteTaskButton.addEventListener('click', async () => {
 
     showMessage(
       cadreTaskMessage,
-      `Đã xóa "${data.deleted_task}" và ${data.deleted_images} ảnh.`,
+      `Đã xóa "${data.deleted_task}" và ${data.deleted_images} tài liệu.`,
       'success'
     );
 

@@ -114,18 +114,35 @@
           </div>
 
           <label id="uploadBox" class="upload-box" for="imagesInput">
-            <input id="imagesInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden />
+            <input
+              id="imagesInput"
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+              multiple
+              hidden
+            />
+
             <div class="upload-icon">↑</div>
+
             <div>
-              <strong id="uploadTitle">Chọn một hoặc nhiều ảnh minh chứng</strong>
-              <p id="uploadHint">PNG, JPG, WEBP · tối đa 8 MB/ảnh · tối đa 10 ảnh/lần</p>
+              <strong id="uploadTitle">Gửi tài liệu của bạn tại đây</strong>
+              <p id="uploadHint">
+                Ảnh · PDF · Word · Excel · PowerPoint · tối đa 20 MB/tệp
+              </p>
             </div>
-            <button id="chooseFilesButton" class="outline-button" type="button">Chọn ảnh</button>
+
+            <button
+              id="chooseFilesButton"
+              class="outline-button"
+              type="button"
+            >
+              Chọn tài liệu
+            </button>
           </label>
 
           <div id="previewWrap" class="preview-wrap hidden">
             <div class="preview-head">
-              <strong id="previewCount">0 ảnh đã chọn</strong>
+              <strong id="previewCount">0 tài liệu đã chọn</strong>
               <span id="previewSize">0 MB</span>
             </div>
             <div id="previewList" class="preview-list"></div>
@@ -165,8 +182,8 @@
     <section id="mySubmissionPanel" class="panel hidden">
       <div class="panel-head">
         <div>
-          <div class="eyebrow">ẢNH CỦA TÔI</div>
-          <h2>Hồ sơ minh chứng cá nhân</h2>
+          <div class="eyebrow">TÀI LIỆU CỦA TÔI</div>
+          <h2>Hồ sơ tài liệu cá nhân</h2>          
           <p id="mySubmissionMeta" class="muted">Chọn task để xem các ảnh bạn đã nộp.</p>
         </div>
         <button id="refreshMySubmission" class="soft-button" type="button">↻ Làm mới</button>
