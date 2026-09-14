@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>ĐH31LQA · Cổng nội bộ</title>
+  <link rel="stylesheet" href="./assets/css/main.css" />
+</head>
+<body>
+  <section id="loginScreen" class="login-screen">
+    <div class="login-orb login-orb-a"></div>
+    <div class="login-orb login-orb-b"></div>
+    <div class="login-shell">
+      <aside class="login-intro">
+        <div class="login-brand">
+          <span class="brand-mark">31</span>
+          <div>
+            <strong>ĐH31LQA</strong>
+            <small>Cổng thông tin nội bộ · Đại đội 14</small>
+          </div>
+        </div>
+        <div class="login-copy">
+          <span class="eyebrow light">HỆ THỐNG NỘI BỘ</span>
+          <h1>Một nơi cho các tiện ích của lớp.</h1>
+          <p>Đăng nhập để vào Dashboard. Gửi minh chứng chỉ là một module trong hệ thống và có thể mở rộng thêm nhiều chức năng sau này.</p>
+        </div>
+        <div class="login-feature-row" aria-hidden="true">
+          <span>◫ Dashboard</span>
+          <span>↑ Minh chứng</span>
+          <span>⌁ Quản lý</span>
+        </div>
+      </aside>
+
+      <main class="login-card-wrap">
+        <article class="login-card">
+          <div class="login-card-head">
+            <span class="eyebrow">ĐĂNG NHẬP</span>
+            <h2>Chào mừng trở lại</h2>
+            <p>Chọn tiểu đội, họ tên và nhập mật khẩu để tiếp tục.</p>
+          </div>
+
+          <form id="loginForm" class="stack-form" novalidate>
+            <label class="field">
+              <span>Tiểu đội / nhóm</span>
+              <select id="unitSelect" required>
+                <option value="">Đang tải danh sách...</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Họ và tên</span>
+              <select id="memberSelect" required disabled>
+                <option value="">Chọn tiểu đội trước</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Mật khẩu</span>
+              <input id="passwordInput" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required />
+            </label>
+            <button id="loginButton" class="primary-button full-button" type="submit">Đăng nhập</button>
+            <div id="loginMessage" class="form-message" role="status" aria-live="polite"></div>
+          </form>
+
+          <div class="login-note">Tài khoản mới sử dụng mật khẩu mặc định <strong>123456</strong>. Bạn có thể đổi sau khi đăng nhập.</div>
+        </article>
+      </main>
+    </div>
+  </section>
+
+  <div id="appShell" class="app-shell hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-top">
+        <a class="sidebar-brand" href="#dashboard" data-nav-target="dashboard" aria-label="Trang tổng quan">
+          <span class="brand-mark small">31</span>
+          <span class="sidebar-brand-copy"><strong>ĐH31LQA</strong><small>Internal Portal</small></span>
+        </a>
+        <button id="sidebarToggle" class="icon-button sidebar-collapse" type="button" aria-label="Thu gọn sidebar">‹</button>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Điều hướng chính">
+        <div class="nav-caption">TỔNG QUAN</div>
+        <button class="nav-item active" type="button" data-view="dashboard">
+          <span class="nav-icon">⌂</span><span class="nav-label">Dashboard</span>
+        </button>
+
+        <div class="nav-caption">CÔNG VIỆC</div>
+        <button class="nav-item" type="button" data-view="submit">
+          <span class="nav-icon">↑</span><span class="nav-label">Gửi minh chứng</span>
+        </button>
+        <button class="nav-item" type="button" data-view="my-files">
+          <span class="nav-icon">▦</span><span class="nav-label">Tài liệu của tôi</span>
+        </button>
+        <button id="managerNav" class="nav-item hidden" type="button" data-view="manager">
+          <span class="nav-icon">⌁</span><span class="nav-label">Quản lý minh chứng</span>
+        </button>
+
+        <div class="nav-caption">CÁ NHÂN</div>
+        <button class="nav-item" type="button" data-view="account">
+          <span class="nav-icon">◎</span><span class="nav-label">Tài khoản</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="sidebar-user">
+          <span id="sidebarAvatar" class="avatar">U</span>
+          <div class="sidebar-user-copy">
+            <strong id="sidebarUserName">Người dùng</strong>
+            <small id="sidebarUserMeta">Học viên</small>
+          </div>
+        </div>
+        <button id="logoutButton" class="nav-item logout-item" type="button">
+          <span class="nav-icon">↪</span><span class="nav-label">Đăng xuất</span>
+        </button>
+      </div>
+    </aside>
+
+    <button id="sidebarBackdrop" class="sidebar-backdrop" type="button" aria-label="Đóng menu"></button>
+
+    <main class="app-main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuButton" class="icon-button mobile-menu" type="button" aria-label="Mở menu">☰</button>
+          <div>
+            <span id="pageEyebrow" class="eyebrow">TỔNG QUAN</span>
+            <h1 id="pageTitle">Dashboard</h1>
+          </div>
+        </div>
+        <div class="topbar-user">
+          <span id="roleBadge" class="role-badge">Học viên</span>
+          <span id="topbarName" class="topbar-name">Người dùng</span>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <div id="defaultPasswordBanner" class="default-password-banner hidden">
+          <span>⚠</span>
+          <div><strong>Bạn đang dùng mật khẩu mặc định.</strong><small>Hãy đổi mật khẩu ở mục Tài khoản để bảo vệ tài khoản của mình.</small></div>
+          <button class="soft-button" type="button" data-go-view="account">Đổi ngay</button>
+        </div>
+
+        <section id="dashboardView" class="app-view active" data-view-panel="dashboard">
+          <div class="welcome-card">
+            <div>
+              <span class="eyebrow light">TRUNG TÂM ĐIỀU KHIỂN</span>
+              <h2 id="sessionGreeting">Xin chào</h2>
+              <p id="sessionMeta">Chọn một chức năng để bắt đầu.</p>
+            </div>
+            <div class="welcome-art" aria-hidden="true"><span>31</span></div>
+          </div>
+
+          <div class="dashboard-cards">
+            <button class="feature-card feature-violet" type="button" data-go-view="submit">
+              <span class="feature-icon">↑</span>
+              <span><strong>Gửi minh chứng</strong><small>Tải ảnh, PDF, Word, Excel, PowerPoint theo task.</small></span>
+              <b>→</b>
+            </button>
+            <button class="feature-card feature-cyan" type="button" data-go-view="my-files">
+              <span class="feature-icon">▦</span>
+              <span><strong>Tài liệu của tôi</strong><small>Xem, tải xuống hoặc xoá tài liệu đã gửi.</small></span>
+              <b>→</b>
+            </button>
+            <button class="feature-card feature-amber" type="button" data-go-view="account">
+              <span class="feature-icon">◎</span>
+              <span><strong>Tài khoản</strong><small>Quản lý mật khẩu và thông tin phiên đăng nhập.</small></span>
+              <b>→</b>
+            </button>
+            <button id="managerFeature" class="feature-card feature-pink hidden" type="button" data-go-view="manager">
+              <span class="feature-icon">⌁</span>
+              <span><strong>Quản lý minh chứng</strong><small>Theo dõi toàn lớp, task và xuất dữ liệu.</small></span>
+              <b>→</b>
+            </button>
+          </div>
+
+          <div class="dashboard-note panel">
+            <div class="note-icon">✦</div>
+            <div><strong>Kiến trúc đã sẵn sàng để mở rộng</strong><p>Sidebar tách riêng từng chức năng, nên sau này có thể thêm lịch học, tài liệu, thông báo, trực nhật hoặc các module khác mà không làm một màn hình bị quá tải.</p></div>
+          </div>
+        </section>
+
+        <section id="submitView" class="app-view" data-view-panel="submit">
+          <div class="content-grid upload-layout">
+            <article class="panel work-panel">
+              <div class="panel-head">
+                <div><span class="eyebrow">GỬI MINH CHỨNG</span><h2>Tải tài liệu lên</h2><p class="muted">Chọn task và gửi tối đa 10 tệp mỗi lần.</p></div>
+              </div>
+              <form id="uploadForm" class="stack-form" novalidate>
+                <label class="field">
+                  <span>Task cần minh chứng</span>
+                  <select id="taskSelect"><option value="">Đang tải task...</option></select>
+                </label>
+
+                <label id="uploadBox" class="upload-box" for="imagesInput">
+                  <input id="imagesInput" type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" multiple hidden />
+                  <div class="upload-icon">↑</div>
+                  <div><strong id="uploadTitle">Kéo thả hoặc chọn tài liệu</strong><p id="uploadHint">Ảnh · PDF · Word · Excel · PowerPoint · tối đa 20 MB/tệp</p></div>
+                  <button id="chooseFilesButton" class="outline-button" type="button">Chọn tài liệu</button>
+                </label>
+
+                <div id="previewWrap" class="preview-wrap hidden">
+                  <div class="preview-head"><strong id="previewCount">0 tài liệu đã chọn</strong><span id="previewSize">0 MB</span></div>
+                  <div id="previewList" class="preview-list"></div>
+                </div>
+                <button id="submitButton" class="primary-button" type="submit">Gửi minh chứng</button>
+                <div id="uploadMessage" class="form-message"></div>
+              </form>
+            </article>
+
+            <aside class="panel progress-panel">
+              <div class="panel-head"><div><span class="eyebrow">TIẾN ĐỘ TASK</span><h2>Đã nộp</h2></div></div>
+              <div class="progress-stat primary-stat"><span>Tổng toàn bộ</span><strong id="countTotal">0</strong><small>người đã gửi</small></div>
+              <div class="compact-stats">
+                <div><span>Cán bộ</span><strong id="countCadre">0</strong></div>
+                <div><span>Tiểu đội 1</span><strong id="count1">0</strong></div>
+                <div><span>Tiểu đội 2</span><strong id="count2">0</strong></div>
+                <div><span>Tiểu đội 3</span><strong id="count3">0</strong></div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="myFilesView" class="app-view" data-view-panel="my-files">
+          <article class="panel">
+            <div class="panel-head wrap-gap">
+              <div><span class="eyebrow">TÀI LIỆU CỦA TÔI</span><h2>Hồ sơ minh chứng</h2><p id="mySubmissionMeta" class="muted">Chọn task ở mục Gửi minh chứng để xem tài liệu.</p></div>
+              <button id="refreshMySubmission" class="soft-button" type="button">↻ Làm mới</button>
+            </div>
+            <div id="mySubmissionMessage" class="form-message"></div>
+            <div id="myImagesGrid" class="file-tiles empty-state">
+              <div class="empty-box"><strong>Chưa có tài liệu.</strong><span>Tài liệu đã gửi sẽ xuất hiện tại đây.</span></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="accountView" class="app-view" data-view-panel="account">
+          <div class="account-grid">
+            <article class="panel profile-card">
+              <span id="accountAvatar" class="account-avatar">U</span>
+              <span class="eyebrow">TÀI KHOẢN</span>
+              <h2 id="accountName">Người dùng</h2>
+              <p id="accountMeta" class="muted">Thông tin phiên đăng nhập</p>
+              <div class="profile-status"><span>Trạng thái</span><strong>Đang đăng nhập</strong></div>
+            </article>
+            <article class="panel">
+              <div class="panel-head"><div><span class="eyebrow">BẢO MẬT</span><h2>Đổi mật khẩu</h2></div></div>
+              <form id="changePasswordForm" class="stack-form" novalidate>
+                <label class="field"><span>Mật khẩu hiện tại</span><input id="currentPassword" type="password" autocomplete="current-password" required /></label>
+                <label class="field"><span>Mật khẩu mới</span><input id="newPassword" type="password" autocomplete="new-password" minlength="6" required /></label>
+                <label class="field"><span>Xác nhận mật khẩu mới</span><input id="confirmPassword" type="password" autocomplete="new-password" minlength="6" required /></label>
+                <button class="secondary-button" type="submit">Đổi mật khẩu</button>
+                <div id="passwordMessage" class="form-message"></div>
+              </form>
+            </article>
+          </div>
+        </section>
+
+        <section id="managerView" class="app-view" data-view-panel="manager">
+          <section class="panel cadre-task-panel">
+            <div class="panel-head wrap-gap">
+              <div><span class="eyebrow">QUẢN LÝ MINH CHỨNG</span><h2>Task & tiến độ toàn lớp</h2><p class="muted">Xem tài liệu theo dạng Tiles, quản lý task và xuất ZIP.</p></div>
+              <div class="action-row"><button id="refreshCadreButton" class="soft-button" type="button">↻ Làm mới</button><button id="exportZipButton" class="primary-button" type="button">↓ Xuất ZIP task</button></div>
+            </div>
+            <div class="cadre-task-grid">
+              <label class="field"><span>Task đang xem</span><select id="cadreTaskSelect"><option value="">Chọn task...</option></select></label>
+              <div class="toggle-card"><span>Trạng thái task</span><button id="toggleTaskButton" class="secondary-button" type="button">Đóng nhận bài</button><button id="deleteTaskButton" class="delete-button" type="button">Xóa task</button></div>
+              <form id="createTaskForm" class="create-task-form"><label class="field"><span>Tạo task mới</span><input id="newTaskTitle" type="text" maxlength="120" placeholder="Ví dụ: Hoàn thành bài eLearning Unit 5" required /></label><button class="secondary-button" type="submit">+ Tạo task</button></form>
+            </div>
+            <div id="cadreTaskMessage" class="form-message"></div>
+          </section>
+
+          <section class="stats-wide-grid">
+            <article class="stat-card violet"><span>Tổng đã nộp</span><strong id="cadreTotal">0</strong></article>
+            <article class="stat-card teal"><span>Cán bộ</span><strong id="cadreCountCadre">0</strong></article>
+            <article class="stat-card blue"><span>Tiểu đội 1</span><strong id="cadreCount1">0</strong></article>
+            <article class="stat-card pink"><span>Tiểu đội 2</span><strong id="cadreCount2">0</strong></article>
+            <article class="stat-card gold"><span>Tiểu đội 3</span><strong id="cadreCount3">0</strong></article>
+          </section>
+
+          <section class="panel cadre-results-panel">
+            <div class="toolbar">
+              <div class="filter-tabs">
+                <button class="filter-tab active" type="button" data-unit="all">Tất cả</button>
+                <button class="filter-tab" type="button" data-unit="cadre">Cán bộ</button>
+                <button class="filter-tab" type="button" data-unit="1">Tiểu đội 1</button>
+                <button class="filter-tab" type="button" data-unit="2">Tiểu đội 2</button>
+                <button class="filter-tab" type="button" data-unit="3">Tiểu đội 3</button>
+              </div>
+              <label class="search-box"><span>⌕</span><input id="cadreSearchInput" type="search" placeholder="Tìm theo họ tên..." /></label>
+            </div>
+            <div id="cadreDashboardMessage" class="form-message"></div>
+            <div id="cadreSections" class="cadre-sections"></div>
+          </section>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="galleryDialog" class="gallery-dialog">
+    <button id="closeGalleryButton" class="dialog-close" type="button" aria-label="Đóng">×</button>
+    <div class="gallery-header">
+      <span class="eyebrow">TÀI LIỆU ĐÃ NỘP</span>
+      <h2 id="galleryTitle">Tài liệu</h2>
+      <p id="galleryMeta" class="muted">Đang tải...</p>
+    </div>
+    <div id="galleryTiles" class="gallery-tiles"></div>
+    <div id="filePreviewPanel" class="file-preview-panel hidden">
+      <div class="file-preview-head">
+        <div><strong id="filePreviewName">Tài liệu</strong><small id="filePreviewInfo">Thông tin</small></div>
+        <div class="action-row"><a id="fileOpenLink" class="soft-button link-button" target="_blank" rel="noopener">Mở file</a><a id="fileDownloadLink" class="primary-button link-button">Tải xuống</a></div>
+      </div>
+      <div id="filePreviewStage" class="file-preview-stage"></div>
+    </div>
+  </dialog>
+
+  <script type="module" src="./assets/js/app.js"></script>
+</body>
+</html>
