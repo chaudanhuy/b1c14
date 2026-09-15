@@ -2784,3 +2784,17 @@ progress::-webkit-progress-value {
     scroll-behavior: auto !important;
   }
 }
+
+.brand-mark {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
