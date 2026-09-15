@@ -1,80 +1,89 @@
-import { requireAuth } from '../_lib/auth.js';
-import { extensionForMime, getFileExtension } from '../_lib/utils.js';
-
-const MIME_BY_EXTENSION = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  webp: 'image/webp',
-  pdf: 'application/pdf',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xls: 'application/vnd.ms-excel',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ppt: 'application/vnd.ms-powerpoint',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-};
-
-function resolveContentType(row, objectHeaders) {
-  const stored = String(row.image_type || '').trim();
-  if (stored && stored !== 'application/octet-stream') return stored;
-  const ext = getFileExtension(row.image_name || '');
-  return MIME_BY_EXTENSION[ext] || objectHeaders.get('Content-Type') || 'application/octet-stream';
-}
-
-function safeFilename(row) {
-  const original = String(row.image_name || '').trim();
-  if (original) return original.replace(/[\r\n]/g, ' ');
-  const ext = extensionForMime(row.image_type || '') || 'bin';
-  return `tai-lieu-${row.id}.${ext}`;
-}
-
+import { requireAuth } from "../_lib/auth.js";
+import { getFileExtension, extensionForMime } from "../_lib/utils.js";
+import { disposition, MIME_BY_EXTENSION, safeFilename } from "../_lib/files.js";
 export async function onRequestGet({ request, env }) {
   const auth = await requireAuth(request, env);
   if (!auth.ok) return auth.response;
-
-  const url = new URL(request.url);
-  const id = Number(url.searchParams.get('id'));
-  const forceDownload = url.searchParams.get('download') === '1';
-
-  if (!Number.isInteger(id) || id < 1) {
-    return new Response('Bad Request', { status: 400 });
+  const url = new URL(request.url),
+    id = Number(url.searchParams.get("id"));
+  if (!Number.isSafeInteger(id) || id < 1)
+    return new Response("Bad Request", { status: 400 });
+  const row = await env.DB.prepare(
+    `SELECT si.*,ts.member_id FROM submission_images si JOIN task_submissions ts ON ts.id = si.submission_id WHERE si.id = ?`,
+  )
+    .bind(id)
+    .first();
+  if (!row) return new Response("Not Found", { status: 404 });
+  if (auth.member.role !== "cadre" && row.member_id !== auth.member.id)
+    return new Response("Forbidden", { status: 403 });
+  const meta = await env.UPLOADS.head(row.image_key);
+  if (!meta) return new Response("Not Found", { status: 404 });
+  const ext =
+      getFileExtension(row.image_name) || extensionForMime(row.image_type),
+    type = MIME_BY_EXTENSION[ext] || "application/octet-stream";
+  const name = safeFilename(row.image_name, `tai-lieu-${id}.${ext || "bin"}`);
+  const filename =
+    getFileExtension(name) || ext === "bin" ? name : `${name}.${ext}`;
+  const inline =
+    url.searchParams.get("download") !== "1" &&
+    ["image/png", "image/jpeg", "image/webp", "application/pdf"].includes(type);
+  const headers = new Headers({
+    "Content-Type": type,
+    "Content-Disposition": disposition(filename, inline),
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": inline ? "private, no-cache" : "private, no-store",
+    Vary: "Cookie",
+    ETag: meta.httpEtag,
+    "Accept-Ranges": "bytes",
+    "Content-Security-Policy":
+      type === "application/pdf"
+        ? "frame-ancestors 'self'"
+        : "default-src 'none'; frame-ancestors 'self'",
+  });
+  // Always authorize before conditional responses; private files must not survive account switching.
+  if (inline && request.headers.get("If-None-Match") === meta.httpEtag)
+    return new Response(null, { status: 304, headers });
+  let range;
+  const requested = request.headers.get("Range"),
+    ifRange = request.headers.get("If-Range");
+  if (requested && (!ifRange || ifRange === meta.httpEtag)) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(requested);
+    if (!match || (!match[1] && !match[2]))
+      return new Response(null, {
+        status: 416,
+        headers: {
+          ...Object.fromEntries(headers),
+          "Content-Range": `bytes */${meta.size}`,
+        },
+      });
+    const start = match[1]
+      ? Number(match[1])
+      : Math.max(0, meta.size - Number(match[2]));
+    const end =
+      match[1] && match[2]
+        ? Math.min(Number(match[2]), meta.size - 1)
+        : meta.size - 1;
+    if (
+      !Number.isSafeInteger(start) ||
+      !Number.isSafeInteger(end) ||
+      start > end ||
+      start >= meta.size
+    )
+      return new Response(null, {
+        status: 416,
+        headers: {
+          ...Object.fromEntries(headers),
+          "Content-Range": `bytes */${meta.size}`,
+        },
+      });
+    range = { offset: start, length: end - start + 1 };
+    headers.set("Content-Range", `bytes ${start}-${end}/${meta.size}`);
   }
-
-  const row = await env.DB.prepare(`
-    SELECT
-      si.id,
-      si.image_key,
-      si.image_type,
-      si.image_name,
-      si.image_size,
-      si.created_at,
-      ts.member_id
-    FROM submission_images si
-    JOIN task_submissions ts ON ts.id = si.submission_id
-    WHERE si.id = ?
-    LIMIT 1
-  `).bind(id).first();
-
-  if (!row) return new Response('Not Found', { status: 404 });
-  if (auth.member.role !== 'cadre' && Number(row.member_id) !== Number(auth.member.id)) {
-    return new Response('Forbidden', { status: 403 });
-  }
-
-  const object = await env.UPLOADS.get(row.image_key);
-  if (!object) return new Response('Not Found', { status: 404 });
-
-  const headers = new Headers();
-  object.writeHttpMetadata(headers);
-
-  const filename = safeFilename(row);
-  const contentType = resolveContentType(row, headers);
-  headers.set('Content-Type', contentType);
-  headers.set('Content-Length', String(row.image_size || object.size || 0));
-  headers.set('Content-Disposition', `${forceDownload ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(filename)}`);
-  headers.set('X-Content-Type-Options', 'nosniff');
-  headers.set('Cache-Control', forceDownload ? 'private, no-store' : 'private, max-age=86400, immutable');
-  if (object.httpEtag) headers.set('ETag', object.httpEtag);
-
-  return new Response(object.body, { headers });
+  const object = await env.UPLOADS.get(
+    row.image_key,
+    range ? { range } : undefined,
+  );
+  if (!object) return new Response("Not Found", { status: 404 });
+  headers.set("Content-Length", String(range ? range.length : object.size));
+  return new Response(object.body, { status: range ? 206 : 200, headers });
 }

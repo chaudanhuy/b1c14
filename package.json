@@ -1,10 +1,22 @@
 {
-  "name": "activity-submission-cloudflare-v3-accounts",
-  "version": "4.1.0",
+  "name": "b1c14-internal-portal",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev public --d1 DB=activity-submission-db --r2 UPLOADS=activity-submission-images",
-    "deploy": "echo Deploy from GitHub to Cloudflare Pages"
+    "dev": "wrangler pages dev public",
+    "build": "npm run sync:admin && wrangler pages functions build functions --outdir=.build",
+    "test": "node --test tests/core.test.mjs tests/frontend.test.mjs",
+    "preview:qa": "node tests/preview.mjs",
+    "format": "prettier --write public functions tests/*.mjs",
+    "sync:admin": "node scripts/sync-admin.mjs"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6",
+    "wrangler": "^4.131.2"
   }
 }

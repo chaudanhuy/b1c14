@@ -1,7 +1,8 @@
-import { UNIT_ORDER, UNIT_LABELS } from '../_lib/utils.js';
+import { UNIT_ORDER, UNIT_LABELS } from "../_lib/utils.js";
 
 export async function onRequestGet({ env }) {
-  const rows = await env.DB.prepare(`
+  const rows = await env.DB.prepare(
+    `
     SELECT id, unit_code, unit_label, name, display_order
     FROM members
     ORDER BY
@@ -14,21 +15,22 @@ export async function onRequestGet({ env }) {
       END,
       display_order ASC,
       name COLLATE NOCASE ASC
-  `).all();
+  `,
+  ).all();
 
-  const groups = UNIT_ORDER.map(code => ({
+  const groups = UNIT_ORDER.map((code) => ({
     code,
     label: UNIT_LABELS[code],
-    members: []
+    members: [],
   }));
-  const map = Object.fromEntries(groups.map(group => [group.code, group]));
+  const map = Object.fromEntries(groups.map((group) => [group.code, group]));
   for (const row of rows.results || []) {
     if (!map[row.unit_code]) continue;
     map[row.unit_code].members.push({
       id: row.id,
       name: row.name,
       unit_code: row.unit_code,
-      unit_label: row.unit_label
+      unit_label: row.unit_label,
     });
   }
 

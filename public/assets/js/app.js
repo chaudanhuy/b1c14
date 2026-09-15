@@ -1,903 +1,1385 @@
-const IS_LOCAL_FILE = window.location.protocol === 'file:';
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const MAX_FILES = 10;
-const MAX_TOTAL_SIZE = 100 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+import {
+  $,
+  $$,
+  escapeHTML as h,
+  normalize,
+  initials,
+  formatBytes,
+  formatDate,
+  dateValue,
+  badge,
+  STATUS,
+  icon,
+  empty,
+  skeleton,
+  loaded,
+  toast,
+  busy,
+  modal,
+  setupUi,
+} from "./ui.js";
+import {
+  fileKind,
+  fileIcon,
+  fileTile,
+  validateSelection,
+  compressImage,
+  openPreview,
+  setupPreview,
+} from "./files.js";
 
-const $ = selector => document.querySelector(selector);
-const $$ = selector => [...document.querySelectorAll(selector)];
-
-const loginScreen = $('#loginScreen');
-const appShell = $('#appShell');
-const unitSelect = $('#unitSelect');
-const memberSelect = $('#memberSelect');
-const passwordInput = $('#passwordInput');
-const loginForm = $('#loginForm');
-const loginButton = $('#loginButton');
-const logoutButton = $('#logoutButton');
-const loginMessage = $('#loginMessage');
-
-const sidebar = $('#sidebar');
-const sidebarToggle = $('#sidebarToggle');
-const sidebarBackdrop = $('#sidebarBackdrop');
-const mobileMenuButton = $('#mobileMenuButton');
-const managerNav = $('#managerNav');
-const managerFeature = $('#managerFeature');
-const pageEyebrow = $('#pageEyebrow');
-const pageTitle = $('#pageTitle');
-const roleBadge = $('#roleBadge');
-const topbarName = $('#topbarName');
-const sidebarAvatar = $('#sidebarAvatar');
-const sidebarUserName = $('#sidebarUserName');
-const sidebarUserMeta = $('#sidebarUserMeta');
-const accountAvatar = $('#accountAvatar');
-const accountName = $('#accountName');
-const accountMeta = $('#accountMeta');
-const sessionGreeting = $('#sessionGreeting');
-const sessionMeta = $('#sessionMeta');
-const defaultPasswordBanner = $('#defaultPasswordBanner');
-
-const taskSelect = $('#taskSelect');
-const uploadForm = $('#uploadForm');
-const imagesInput = $('#imagesInput');
-const chooseFilesButton = $('#chooseFilesButton');
-const uploadBox = $('#uploadBox');
-const uploadTitle = $('#uploadTitle');
-const uploadHint = $('#uploadHint');
-const previewWrap = $('#previewWrap');
-const previewList = $('#previewList');
-const previewCount = $('#previewCount');
-const previewSize = $('#previewSize');
-const submitButton = $('#submitButton');
-const uploadMessage = $('#uploadMessage');
-
-const refreshMySubmission = $('#refreshMySubmission');
-const mySubmissionMeta = $('#mySubmissionMeta');
-const mySubmissionMessage = $('#mySubmissionMessage');
-const myImagesGrid = $('#myImagesGrid');
-
-const changePasswordForm = $('#changePasswordForm');
-const currentPassword = $('#currentPassword');
-const newPassword = $('#newPassword');
-const confirmPassword = $('#confirmPassword');
-const passwordMessage = $('#passwordMessage');
-
-const countTotal = $('#countTotal');
-const countCadre = $('#countCadre');
-const count1 = $('#count1');
-const count2 = $('#count2');
-const count3 = $('#count3');
-
-const cadreTaskSelect = $('#cadreTaskSelect');
-const newTaskTitle = $('#newTaskTitle');
-const createTaskForm = $('#createTaskForm');
-const cadreTaskMessage = $('#cadreTaskMessage');
-const refreshCadreButton = $('#refreshCadreButton');
-const toggleTaskButton = $('#toggleTaskButton');
-const deleteTaskButton = $('#deleteTaskButton');
-const exportZipButton = $('#exportZipButton');
-const cadreSearchInput = $('#cadreSearchInput');
-const cadreSections = $('#cadreSections');
-const cadreDashboardMessage = $('#cadreDashboardMessage');
-const cadreTotal = $('#cadreTotal');
-const cadreCountCadre = $('#cadreCountCadre');
-const cadreCount1 = $('#cadreCount1');
-const cadreCount2 = $('#cadreCount2');
-const cadreCount3 = $('#cadreCount3');
-const filterTabs = $$('.filter-tab');
-
-const galleryDialog = $('#galleryDialog');
-const closeGalleryButton = $('#closeGalleryButton');
-const galleryTitle = $('#galleryTitle');
-const galleryMeta = $('#galleryMeta');
-const galleryTiles = $('#galleryTiles');
-const filePreviewPanel = $('#filePreviewPanel');
-const filePreviewName = $('#filePreviewName');
-const filePreviewInfo = $('#filePreviewInfo');
-const filePreviewStage = $('#filePreviewStage');
-const fileOpenLink = $('#fileOpenLink');
-const fileDownloadLink = $('#fileDownloadLink');
-
-let roster = [];
-let currentMember = null;
-let tasks = [];
-let cadreTasks = [];
-let cadreSubmissions = [];
-let currentFilterUnit = 'all';
-let previewUrls = [];
-let galleryImages = [];
-let galleryOwner = null;
-
-const VIEW_META = {
-  dashboard: ['TỔNG QUAN', 'Dashboard'],
-  submit: ['CÔNG VIỆC', 'Gửi minh chứng'],
-  'my-files': ['CÁ NHÂN', 'Tài liệu của tôi'],
-  account: ['CÁ NHÂN', 'Tài khoản'],
-  manager: ['QUẢN TRỊ', 'Quản lý minh chứng']
+const state = {
+  member: null,
+  tasks: [],
+  view: "dashboard",
+  roster: [],
+  epoch: 0,
+  selected: [],
+  uploading: false,
+  myFiles: [],
+  members: [],
+  gallery: [],
+  selectedReviews: new Set(),
+  managerTask: null,
 };
-
-function escapeHTML(value = '') {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+const requests = new Map(),
+  metadataCache = new Map();
+const VIEWS = {
+  dashboard: "Tổng quan",
+  tasks: "Nhiệm vụ của tôi",
+  submit: "Gửi minh chứng",
+  files: "Tài liệu của tôi",
+  manager: "Quản lý minh chứng",
+  account: "Tài khoản",
+};
+const safeRun = (fn) =>
+  Promise.resolve()
+    .then(fn)
+    .catch((error) => {
+      if (error.name !== "AbortError") toast(error.message, "error");
+    });
+function message(id, text, error = false) {
+  const node = $(id);
+  node.textContent = text;
+  node.classList.toggle("error", error);
 }
-
-function showMessage(node, text, type = '') {
-  if (!node) return;
-  node.className = `form-message ${type}`.trim();
-  node.textContent = text || '';
+function isExpired(task) {
+  return !!task?.due_at && +dateValue(task.due_at) <= Date.now();
 }
-
-function formatBytes(bytes = 0) {
-  const value = Number(bytes) || 0;
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+function canSubmit(task) {
+  return !!task?.is_active && !isExpired(task);
 }
-
-function formatDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('vi-VN');
+function taskById(id) {
+  return state.tasks.find((t) => Number(t.id) === Number(id));
 }
-
-function getFileExtension(name = '') {
-  const match = String(name).toLowerCase().match(/\.([a-z0-9]+)$/);
-  return match ? match[1] : '';
+function selectedTask(select) {
+  return taskById($(select).value);
 }
-
-function isImageFile(file) {
-  return String(file?.type || file?.image_type || '').startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp'].includes(getFileExtension(file?.name || file?.image_name));
+function deadline(task) {
+  return `<span class="deadline ${isExpired(task) ? "overdue" : ""}">${icon("clock")}${task.due_at ? `${isExpired(task) ? "Hết hạn: " : "Hạn: "}${formatDate(task.due_at, true)}` : "Không có hạn chót"}</span>`;
 }
-
-function fileKind(file) {
-  const ext = getFileExtension(file?.name || file?.image_name || '');
-  const type = String(file?.type || file?.image_type || '').toLowerCase();
-  if (type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return { key: 'image', label: 'IMAGE' };
-  if (type === 'application/pdf' || ext === 'pdf') return { key: 'pdf', label: 'PDF' };
-  if (type.includes('word') || type.includes('msword') || ['doc', 'docx'].includes(ext)) return { key: 'word', label: 'WORD' };
-  if (type.includes('excel') || type.includes('spreadsheet') || ['xls', 'xlsx'].includes(ext)) return { key: 'excel', label: 'EXCEL' };
-  if (type.includes('powerpoint') || type.includes('presentation') || ['ppt', 'pptx'].includes(ext)) return { key: 'powerpoint', label: 'PPT' };
-  return { key: 'file', label: (ext || 'FILE').toUpperCase() };
+function abortRequests() {
+  for (const request of requests.values()) request.abort();
+  requests.clear();
 }
-
-function fileUrl(file, download = false) {
-  const params = new URLSearchParams({ id: String(file.id) });
-  if (file.created_at) params.set('v', String(file.created_at));
-  if (download) params.set('download', '1');
-  return `/api/image?${params.toString()}`;
-}
-
-function setButtonLoading(button, loading, loadingText = 'Đang xử lý...') {
-  if (!button) return;
-  if (!button.dataset.defaultLabel) button.dataset.defaultLabel = button.textContent;
-  button.disabled = loading;
-  button.textContent = loading ? loadingText : button.dataset.defaultLabel;
-}
-
-function initials(name = '') {
-  const words = String(name).trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return 'U';
-  return `${words[0][0] || ''}${words.at(-1)?.[0] || ''}`.toUpperCase();
-}
-
-function clearPreviewUrls() {
-  previewUrls.forEach(url => URL.revokeObjectURL(url));
-  previewUrls = [];
-}
-
-function clearPreviews() {
-  clearPreviewUrls();
-  previewList.replaceChildren();
-  previewWrap.classList.add('hidden');
-  uploadTitle.textContent = 'Kéo thả hoặc chọn tài liệu';
-  uploadHint.textContent = 'Ảnh · PDF · Word · Excel · PowerPoint · tối đa 20 MB/tệp';
-}
-
-function validateFiles(files) {
-  if (!files.length) return 'Bạn chưa chọn tài liệu.';
-  if (files.length > MAX_FILES) return `Mỗi lần chỉ chọn tối đa ${MAX_FILES} tài liệu.`;
-  let total = 0;
-  for (const file of files) {
-    const ext = getFileExtension(file.name);
-    if (!ALLOWED_EXTENSIONS.includes(ext)) return `File "${file.name}" không thuộc định dạng được hỗ trợ.`;
-    if (file.size > MAX_FILE_SIZE) return `File "${file.name}" vượt quá 20 MB.`;
-    total += file.size;
+async function api(url, { body, method = "GET", signal, ...options } = {}) {
+  const headers = new Headers(options.headers || {});
+  if (method !== "GET" && method !== "HEAD")
+    headers.set("X-Requested-With", "B1C14");
+  if (body && !(body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+    body = JSON.stringify(body);
   }
-  if (total > MAX_TOTAL_SIZE) return 'Tổng dung lượng tài liệu vượt quá 100 MB.';
-  return '';
-}
-
-async function fetchJSON(url, options = {}) {
-  const response = await fetch(url, { cache: 'no-store', ...options });
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      method,
+      body,
+      headers,
+      signal,
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw new Error("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
+  }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Có lỗi xảy ra.');
+  if (!response.ok) {
+    if (data.code === "AUTH_REQUIRED") expireSession();
+    throw new Error(data.error || `Yêu cầu thất bại (${response.status}).`);
+  }
   return data;
 }
-
-function showView(name) {
-  if (name === 'manager' && currentMember?.role !== 'cadre') name = 'dashboard';
-  $$('.app-view').forEach(view => view.classList.toggle('active', view.dataset.viewPanel === name));
-  $$('.nav-item[data-view]').forEach(item => item.classList.toggle('active', item.dataset.view === name));
-  const [eyebrow, title] = VIEW_META[name] || VIEW_META.dashboard;
-  pageEyebrow.textContent = eyebrow;
-  pageTitle.textContent = title;
-  sidebar.classList.remove('open');
-  if (history.replaceState) history.replaceState(null, '', `#${name}`);
-
-  if (name === 'my-files') loadMySubmission().catch(error => showMessage(mySubmissionMessage, error.message, 'error'));
-  if (name === 'manager' && currentMember?.role === 'cadre') loadCadreDashboard().catch(error => showMessage(cadreDashboardMessage, error.message, 'error'));
+async function latest(channel, work, apply) {
+  requests.get(channel)?.abort();
+  const controller = new AbortController();
+  requests.set(channel, controller);
+  const epoch = state.epoch;
+  try {
+    const data = await work(controller.signal);
+    if (
+      epoch !== state.epoch ||
+      controller.signal.aborted ||
+      requests.get(channel) !== controller
+    )
+      return;
+    apply(data);
+  } finally {
+    if (requests.get(channel) === controller) requests.delete(channel);
+  }
 }
-
-function setSessionUI(member) {
-  currentMember = member;
-  const loggedIn = !!member;
-  loginScreen.classList.toggle('hidden', loggedIn);
-  appShell.classList.toggle('hidden', !loggedIn);
-  managerNav.classList.toggle('hidden', !(loggedIn && member.role === 'cadre'));
-  managerFeature.classList.toggle('hidden', !(loggedIn && member.role === 'cadre'));
-
-  if (!loggedIn) {
-    $$('.app-view').forEach(view => view.classList.toggle('active', view.dataset.viewPanel === 'dashboard'));
-    $$('.nav-item[data-view]').forEach(item => item.classList.toggle('active', item.dataset.view === 'dashboard'));
+function clearSelected() {
+  state.selected.forEach((r) => {
+    if (r.url) URL.revokeObjectURL(r.url);
+  });
+  state.selected = [];
+  $("#fileInput").value = "";
+  renderSelected();
+}
+function expireSession() {
+  state.epoch++;
+  abortRequests();
+  metadataCache.clear();
+  clearSelected();
+  state.member = null;
+  state.tasks = [];
+  state.members = [];
+  state.myFiles = [];
+  state.gallery = [];
+  state.selectedReviews.clear();
+  $$("dialog[open]").forEach((d) => d.close());
+  $("#myFilesGrid").replaceChildren();
+  $("#galleryFiles").replaceChildren();
+  $("#membersBody").replaceChildren();
+  $("#appShell").hidden = true;
+  $("#loginScreen").hidden = false;
+  closeMenu(false);
+  safeRun(loadRoster);
+}
+function setTheme(theme) {
+  try {
+    localStorage.setItem("b1-theme", theme);
+  } catch {}
+  document.documentElement.dataset.theme = theme;
+  $("#themeSelect").value = theme;
+  updateThemeButtons();
+}
+function updateThemeButtons() {
+  const pref = document.documentElement.dataset.theme || "system";
+  const dark =
+    pref === "dark" ||
+    (pref === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+  $$("[data-theme-cycle]").forEach((b) => {
+    b.innerHTML = icon(dark ? "moon" : "sun");
+    b.setAttribute(
+      "aria-label",
+      dark ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối",
+    );
+  });
+}
+const isMobile = () => matchMedia("(max-width: 768px)").matches;
+function closeMenu(focus = true) {
+  const wasOpen = $("#sidebar").classList.contains("open");
+  $("#sidebar").classList.remove("open");
+  $("#sidebarBackdrop").hidden = true;
+  $(".main-shell").inert = false;
+  $(".bottom-nav").inert = false;
+  $("#sidebar").inert = isMobile();
+  document.body.style.overflow = "";
+  $("#menuButton").setAttribute(
+    "aria-expanded",
+    String(
+      !isMobile() && !document.documentElement.classList.contains("collapsed"),
+    ),
+  );
+  if (focus && wasOpen) $("#menuButton").focus();
+}
+function openMenu() {
+  if (!isMobile()) {
+    document.documentElement.classList.toggle("collapsed");
+    try {
+      localStorage.setItem(
+        "b1-sidebar",
+        document.documentElement.classList.contains("collapsed")
+          ? "collapsed"
+          : "open",
+      );
+    } catch {}
+    $("#menuButton").setAttribute(
+      "aria-expanded",
+      String(!document.documentElement.classList.contains("collapsed")),
+    );
     return;
   }
-
-  const roleText = member.role === 'cadre' ? 'Quyền quản lý' : 'Học viên';
-  const avatarText = initials(member.name);
-  roleBadge.textContent = roleText;
-  roleBadge.style.color = member.role === 'cadre' ? '#087f79' : '#4353b8';
-  roleBadge.style.background = member.role === 'cadre' ? '#dff7f4' : '#ebedff';
-  topbarName.textContent = member.name;
-  sidebarAvatar.textContent = avatarText;
-  sidebarUserName.textContent = member.name;
-  sidebarUserMeta.textContent = member.unit_label;
-  accountAvatar.textContent = avatarText;
-  accountName.textContent = member.name;
-  accountMeta.textContent = `${member.unit_label} · ${roleText}`;
-  sessionGreeting.textContent = `Xin chào, ${member.name}`;
-  sessionMeta.textContent = `${member.unit_label} · Chọn một chức năng trong sidebar để bắt đầu.`;
-  defaultPasswordBanner.classList.toggle('hidden', !member.is_default_password);
-
-  const requested = location.hash.replace('#', '');
-  showView(VIEW_META[requested] ? requested : 'dashboard');
+  $("#sidebar").inert = false;
+  $("#sidebar").classList.add("open");
+  $("#sidebarBackdrop").hidden = false;
+  $(".main-shell").inert = true;
+  $(".bottom-nav").inert = true;
+  document.body.style.overflow = "hidden";
+  $("#menuButton").setAttribute("aria-expanded", "true");
+  $("#closeMenu").focus();
 }
-
-function resetMessages() {
-  [loginMessage, uploadMessage, passwordMessage, mySubmissionMessage, cadreTaskMessage, cadreDashboardMessage].forEach(node => showMessage(node, ''));
-}
-
-function getGroupMembers(unitCode) {
-  return roster.find(group => group.code === unitCode)?.members || [];
-}
-
-function populateUnitSelect() {
-  unitSelect.innerHTML = '<option value="">Chọn tiểu đội / nhóm</option>';
-  for (const group of roster) {
-    const option = document.createElement('option');
-    option.value = group.code;
-    option.textContent = group.label;
-    unitSelect.appendChild(option);
+function showView(view, { load = true } = {}) {
+  if (!state.member) return;
+  if (
+    !Object.hasOwn(VIEWS, view) ||
+    (view === "manager" && state.member.role !== "cadre")
+  )
+    view = "dashboard";
+  state.view = view;
+  $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== view));
+  $$("[data-view]").forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  $("#pageTitle").textContent = VIEWS[view];
+  document.title = `${VIEWS[view]} · ĐH31LQA`;
+  closeMenu(false);
+  history.replaceState(null, "", "#" + view);
+  $("#mainContent").focus({ preventScroll: true });
+  window.scrollTo({ top: 0, behavior: "instant" });
+  if (load) {
+    if (view === "files") safeRun(() => loadMyFiles());
+    else if (view === "manager") safeRun(loadManager);
+    else if (view === "tasks" || view === "dashboard") safeRun(loadTasks);
   }
 }
-
-function populateMemberSelect(unitCode) {
-  memberSelect.replaceChildren();
-  if (!unitCode) {
-    memberSelect.innerHTML = '<option value="">Chọn tiểu đội trước</option>';
-    memberSelect.disabled = true;
-    return;
-  }
-  memberSelect.disabled = false;
-  const first = document.createElement('option');
-  first.value = '';
-  first.textContent = 'Chọn họ và tên';
-  memberSelect.appendChild(first);
-  for (const member of getGroupMembers(unitCode)) {
-    const option = document.createElement('option');
-    option.value = String(member.id);
-    option.textContent = member.name;
-    memberSelect.appendChild(option);
-  }
+function activate(member) {
+  state.epoch++;
+  state.member = member;
+  $("#loginScreen").hidden = true;
+  $("#appShell").hidden = false;
+  $$("[data-member-name]").forEach((n) => (n.textContent = member.name));
+  $$("[data-member-unit]").forEach((n) => (n.textContent = member.unit_label));
+  $$("[data-member-initials]").forEach(
+    (n) => (n.textContent = initials(member.name)),
+  );
+  $$("[data-manager-only]").forEach(
+    (n) => (n.hidden = member.role !== "cadre"),
+  );
+  $("#accountRole").textContent =
+    member.role === "cadre" ? "Quyền quản lý" : "Học viên";
+  $("#defaultPasswordBanner").hidden = !member.is_default_password;
+  $("#greeting").textContent =
+    `Chào ${member.name.split(" ").slice(-2).join(" ")}!`;
+  $("#todayLabel").textContent = new Date().toLocaleDateString("vi-VN", {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+  });
+  $("#themeSelect").value = document.documentElement.dataset.theme || "system";
+  closeMenu(false);
 }
-
 async function loadRoster() {
-  if (IS_LOCAL_FILE) {
-    roster = [
-      { code: 'cadre', label: 'Cán bộ trung đội', members: [{ id: 1, name: 'Vũ Trọng Thắng' }] },
-      { code: '1', label: 'Tiểu đội 1', members: [{ id: 2, name: 'Châu Đan Huy' }] },
-      { code: '2', label: 'Tiểu đội 2', members: [{ id: 3, name: 'Thái Thanh Phong' }] },
-      { code: '3', label: 'Tiểu đội 3', members: [{ id: 4, name: 'Trần Hoàng Kiên' }] }
-    ];
-  } else {
-    const data = await fetchJSON('/api/roster');
-    roster = data.groups || [];
+  $("#retryLogin").hidden = true;
+  $("#unitSelect").disabled = true;
+  try {
+    const data = await api("/api/roster");
+    state.roster = data.groups || [];
+    $("#unitSelect").innerHTML =
+      '<option value="">Chọn tiểu đội / nhóm</option>' +
+      state.roster
+        .map((g) => `<option value="${h(g.code)}">${h(g.label)}</option>`)
+        .join("");
+    $("#unitSelect").disabled = false;
+    $("#memberSelect").innerHTML =
+      '<option value="">Chọn tiểu đội trước</option>';
+    $("#memberSelect").disabled = true;
+    message("#loginMessage", "");
+  } catch (error) {
+    $("#unitSelect").innerHTML =
+      '<option value="">Chưa tải được danh sách</option>';
+    $("#retryLogin").hidden = false;
+    message("#loginMessage", error.message, true);
   }
-  populateUnitSelect();
 }
-
-async function loadSession() {
-  if (IS_LOCAL_FILE) return setSessionUI(null);
-  const data = await fetchJSON('/api/auth/me').catch(() => ({ authenticated: false }));
-  setSessionUI(data.member || null);
-  if (data.member) await afterLogin();
+function fillTasks(node, tasks, label) {
+  const old = node.value;
+  node.innerHTML = tasks.length
+    ? tasks
+        .map(
+          (t) =>
+            `<option value="${t.id}">${h(t.title)}${!t.is_active ? " · Đã đóng" : isExpired(t) ? " · Hết hạn" : ""}</option>`,
+        )
+        .join("")
+    : `<option value="">${label}</option>`;
+  if (tasks.some((t) => String(t.id) === old)) node.value = old;
 }
-
-async function loadTasks(forCadre = false) {
-  if (!currentMember) return;
-  const url = forCadre && currentMember.role === 'cadre' ? '/api/tasks?all=1' : '/api/tasks';
-  const data = await fetchJSON(url);
-
-  if (forCadre) {
-    cadreTasks = data.tasks || [];
-    renderCadreTaskSelect();
-    return;
+async function loadTasks() {
+  if (!state.member) return;
+  if (!state.tasks.length) {
+    skeleton($("#dashboardStats"), 4, "tile");
+    skeleton($("#taskList"), 4, "tile");
   }
-
-  tasks = data.tasks || [];
-  const activeTasks = tasks.filter(task => Number(task.is_active) === 1);
-  taskSelect.replaceChildren();
-  if (!activeTasks.length) {
-    taskSelect.innerHTML = '<option value="">Hiện chưa có task nào đang mở</option>';
-    submitButton.disabled = true;
-    return;
-  }
-  for (const task of activeTasks) {
-    const option = document.createElement('option');
-    option.value = String(task.id);
-    option.textContent = task.title;
-    taskSelect.appendChild(option);
-  }
-  submitButton.disabled = false;
-}
-
-function renderCadreTaskSelect() {
-  const oldValue = cadreTaskSelect.value;
-  cadreTaskSelect.replaceChildren();
-  if (!cadreTasks.length) {
-    cadreTaskSelect.innerHTML = '<option value="">Chưa có task</option>';
-    updateCadreToggleButton();
-    return;
-  }
-  for (const task of cadreTasks) {
-    const option = document.createElement('option');
-    option.value = String(task.id);
-    option.textContent = `${task.title}${Number(task.is_active) ? '' : ' · đã đóng'}`;
-    cadreTaskSelect.appendChild(option);
-  }
-  if (cadreTasks.some(task => String(task.id) === oldValue)) cadreTaskSelect.value = oldValue;
-  updateCadreToggleButton();
-}
-
-async function loadStats(taskId = Number(taskSelect.value || cadreTaskSelect.value)) {
-  const statEls = [countTotal, countCadre, count1, count2, count3, cadreTotal, cadreCountCadre, cadreCount1, cadreCount2, cadreCount3];
-  if (!taskId) {
-    statEls.forEach(el => { if (el) el.textContent = '0'; });
-    return;
-  }
-  const data = await fetchJSON(`/api/stats?task_id=${encodeURIComponent(taskId)}`);
-  countTotal.textContent = String(data.total ?? 0);
-  countCadre.textContent = String(data.counts?.cadre ?? 0);
-  count1.textContent = String(data.counts?.['1'] ?? 0);
-  count2.textContent = String(data.counts?.['2'] ?? 0);
-  count3.textContent = String(data.counts?.['3'] ?? 0);
-  cadreTotal.textContent = String(data.total ?? 0);
-  cadreCountCadre.textContent = String(data.counts?.cadre ?? 0);
-  cadreCount1.textContent = String(data.counts?.['1'] ?? 0);
-  cadreCount2.textContent = String(data.counts?.['2'] ?? 0);
-  cadreCount3.textContent = String(data.counts?.['3'] ?? 0);
-}
-
-function renderSelectedFiles() {
-  const files = [...imagesInput.files];
-  const error = validateFiles(files);
-  clearPreviews();
-  if (error) {
-    if (files.length) showMessage(uploadMessage, error, 'error');
-    return;
-  }
-  if (!files.length) return;
-  showMessage(uploadMessage, '');
-
-  const total = files.reduce((sum, file) => sum + file.size, 0);
-  previewCount.textContent = `${files.length} tài liệu đã chọn`;
-  previewSize.textContent = formatBytes(total);
-
-  for (const file of files) {
-    const kind = fileKind(file);
-    const card = document.createElement('div');
-    card.className = 'preview-item';
-    if (isImageFile(file)) {
-      const url = URL.createObjectURL(file);
-      previewUrls.push(url);
-      card.innerHTML = `<img src="${url}" alt="${escapeHTML(file.name)}"><div class="preview-meta"><strong>${escapeHTML(file.name)}</strong><small>${formatBytes(file.size)}</small></div>`;
-    } else {
-      card.innerHTML = `<div class="file-preview-placeholder"><span>${kind.label}</span></div><div class="preview-meta"><strong>${escapeHTML(file.name)}</strong><small>${formatBytes(file.size)}</small></div>`;
+  try {
+    await latest(
+      "tasks",
+      (signal) =>
+        api(`/api/tasks${state.member.role === "cadre" ? "?all=1" : ""}`, {
+          signal,
+        }),
+      (data) => {
+        const previousUpload = $("#uploadTask").value;
+        state.tasks = data.tasks || [];
+        fillTasks(
+          $("#uploadTask"),
+          state.tasks.filter((t) => t.is_active),
+          "Chưa có nhiệm vụ đang mở",
+        );
+        fillTasks(
+          $("#filesTask"),
+          state.tasks.filter((t) => t.is_active || t.file_count),
+          "Chưa có nhiệm vụ",
+        );
+        fillTasks($("#managerTask"), state.tasks, "Chưa có nhiệm vụ");
+        if (
+          previousUpload &&
+          previousUpload !== $("#uploadTask").value &&
+          state.selected.length &&
+          !state.uploading
+        ) {
+          clearSelected();
+          toast(
+            "Nhiệm vụ vừa thay đổi hoặc đóng. Hãy chọn lại tệp cho nhiệm vụ tiếp theo.",
+            "info",
+          );
+        }
+        renderDashboard();
+        renderTasks();
+        renderUploadTask();
+        $("#navTaskCount").textContent = state.tasks.filter(
+          (t) => t.is_active && t.status !== "approved",
+        ).length;
+      },
+    );
+  } catch (error) {
+    if (error.name !== "AbortError" && !state.tasks.length) {
+      loaded(
+        $("#dashboardStats"),
+        empty(
+          "Chưa tải được nhiệm vụ",
+          error.message,
+          '<button class="button soft" data-refresh="tasks">Thử lại</button>',
+        ),
+      );
+      loaded($("#taskList"), empty("Chưa tải được nhiệm vụ", error.message));
+      $("#completionLabel").textContent = "Chưa có dữ liệu";
     }
-    previewList.appendChild(card);
-  }
-  uploadTitle.textContent = `${files.length} tài liệu đã sẵn sàng`;
-  uploadHint.textContent = 'Bạn có thể chọn lại nếu muốn thay đổi danh sách.';
-  previewWrap.classList.remove('hidden');
-}
-
-function createFileTile(file, options = {}) {
-  const kind = fileKind(file);
-  const article = document.createElement('article');
-  article.className = 'file-tile';
-  const name = file.image_name || file.name || 'Tài liệu';
-  const info = [formatBytes(file.image_size || file.size || 0), formatDate(file.created_at)].filter(Boolean).join(' · ');
-  article.innerHTML = `
-    <button class="file-tile-main" type="button" data-file-open="${file.id}">
-      <span class="file-icon ${kind.key}">${kind.label}</span>
-      <span class="file-tile-name" title="${escapeHTML(name)}">${escapeHTML(name)}</span>
-    </button>
-    <div class="file-tile-meta">
-      <span class="file-tile-info">${escapeHTML(info || kind.label)}</span>
-      <div class="file-tile-actions">
-        <button class="file-action primary" type="button" data-file-open="${file.id}">${kind.key === 'image' ? 'Xem' : 'Chi tiết'}</button>
-        <a class="file-action" href="${fileUrl(file, true)}">Tải xuống</a>
-        ${options.allowDelete ? `<button class="file-action danger" type="button" data-file-delete="${file.id}">Xóa</button>` : ''}
-      </div>
-    </div>`;
-  return article;
-}
-
-async function loadMySubmission() {
-  if (!currentMember) return;
-  const taskId = Number(taskSelect.value);
-  if (!taskId) {
-    mySubmissionMeta.textContent = 'Chưa có task đang mở.';
-    myImagesGrid.className = 'file-tiles empty-state';
-    myImagesGrid.innerHTML = '<div class="empty-box"><strong>Chưa chọn được task.</strong><span>Khi có task đang mở, tài liệu của bạn sẽ hiển thị ở đây.</span></div>';
-    return;
-  }
-
-  showMessage(mySubmissionMessage, 'Đang tải danh sách tài liệu...');
-  const data = await fetchJSON(`/api/me/submission?task_id=${encodeURIComponent(taskId)}`);
-  const task = tasks.find(item => Number(item.id) === taskId) || cadreTasks.find(item => Number(item.id) === taskId);
-  mySubmissionMeta.textContent = task ? `Task: ${task.title}` : 'Hồ sơ hiện tại';
-
-  const files = data.images || [];
-  if (!data.submission || !files.length) {
-    myImagesGrid.className = 'file-tiles empty-state';
-    myImagesGrid.innerHTML = '<div class="empty-box"><strong>Chưa có tài liệu trong task này.</strong><span>Tài liệu sau khi gửi sẽ xuất hiện tại đây.</span></div>';
-    showMessage(mySubmissionMessage, '');
-    return;
-  }
-
-  myImagesGrid.className = 'file-tiles';
-  myImagesGrid.replaceChildren();
-  files.forEach(file => myImagesGrid.appendChild(createFileTile(file, { allowDelete: true })));
-  showMessage(mySubmissionMessage, `${files.length} tài liệu · bấm vào một ô để xem chi tiết.`);
-}
-
-async function afterLogin() {
-  resetMessages();
-  await loadTasks(false);
-  await Promise.all([loadStats(Number(taskSelect.value)), loadMySubmission()]);
-  if (currentMember?.role === 'cadre') {
-    await loadTasks(true);
-    await loadCadreDashboard();
+    throw error;
   }
 }
-
-async function loadCadreDashboard() {
-  if (currentMember?.role !== 'cadre') return;
-  if (!cadreTasks.length) {
-    cadreSections.innerHTML = '<div class="empty-box"><strong>Chưa có task nào.</strong><span>Hãy tạo task mới để bắt đầu thống kê.</span></div>';
-    await loadStats(0);
-    return;
-  }
-  if (!cadreTaskSelect.value) cadreTaskSelect.value = String(cadreTasks[0].id);
-  updateCadreToggleButton();
-  await Promise.all([loadStats(Number(cadreTaskSelect.value)), fetchCadreSubmissions()]);
-}
-
-function updateCadreToggleButton() {
-  const task = cadreTasks.find(item => String(item.id) === String(cadreTaskSelect.value));
-  const disabled = !task;
-  toggleTaskButton.disabled = disabled;
-  deleteTaskButton.disabled = disabled;
-  exportZipButton.disabled = disabled;
-  if (task) toggleTaskButton.textContent = Number(task.is_active) ? 'Đóng nhận bài' : 'Mở nhận bài';
-}
-
-async function fetchCadreSubmissions() {
-  const taskId = Number(cadreTaskSelect.value);
-  if (!taskId) return;
-  showMessage(cadreDashboardMessage, 'Đang tải danh sách nộp bài...');
-  const data = await fetchJSON(`/api/cadre/submissions?task_id=${encodeURIComponent(taskId)}`);
-  cadreSubmissions = data.submissions || [];
-  renderCadreSections();
-  const task = cadreTasks.find(item => Number(item.id) === taskId);
-  showMessage(cadreDashboardMessage, task ? `Task: ${task.title} · ${cadreSubmissions.length} người đã nộp` : '');
-}
-
-function renderCadreSections() {
-  const sections = [
-    { code: 'cadre', label: 'Cán bộ trung đội' },
-    { code: '1', label: 'Tiểu đội 1' },
-    { code: '2', label: 'Tiểu đội 2' },
-    { code: '3', label: 'Tiểu đội 3' }
+function renderDashboard() {
+  const tasks = state.tasks.filter((t) => t.is_active),
+    approved = tasks.filter((t) => t.status === "approved").length,
+    pending = tasks.filter((t) => t.status === "pending").length,
+    missing = tasks.filter(
+      (t) => t.status === "not_submitted" || t.status === "rejected",
+    ).length;
+  const cards = [
+    [
+      "Nhiệm vụ đang mở",
+      tasks.length,
+      "Trong không gian của bạn",
+      "layers",
+      "indigo",
+    ],
+    [
+      "Đã hoàn thành",
+      approved,
+      "Minh chứng được duyệt đạt",
+      "check-square",
+      "teal",
+    ],
+    ["Đang chờ duyệt", pending, "Đã gửi, chờ kết quả", "clock", "amber"],
+    ["Cần thực hiện", missing, "Chưa nộp hoặc cần nộp lại", "activity", "rose"],
   ];
-  const search = cadreSearchInput.value.trim().toLowerCase();
-  cadreSections.replaceChildren();
-  let shown = 0;
-
-  for (const section of sections) {
-    if (currentFilterUnit !== 'all' && currentFilterUnit !== section.code) continue;
-    const items = cadreSubmissions.filter(item => item.unit_code === section.code && (!search || item.name.toLowerCase().includes(search)));
-    const card = document.createElement('section');
-    card.className = 'section-card';
-    card.innerHTML = `<div class="section-head"><h3>${section.label}</h3><span>${items.length} người đã nộp</span></div><div class="section-grid"></div>`;
-    const grid = card.querySelector('.section-grid');
-
-    if (!items.length) {
-      grid.innerHTML = '<div class="empty-box"><strong>Chưa có bản nộp.</strong><span>Khi có người nộp, dữ liệu sẽ xuất hiện ở đây.</span></div>';
-    } else {
-      shown += items.length;
-      for (const item of items) {
-        const article = document.createElement('article');
-        article.className = 'person-card';
-        article.innerHTML = `<strong>${escapeHTML(item.name)}</strong><div class="person-meta"><div>${Number(item.image_count) || 0} tài liệu</div><div>Cập nhật: ${escapeHTML(formatDate(item.updated_at))}</div></div><button class="soft-button" type="button">Xem tài liệu</button>`;
-        article.querySelector('button').addEventListener('click', () => openGallery(item));
-        grid.appendChild(article);
+  loaded(
+    $("#dashboardStats"),
+    cards
+      .map(
+        ([title, note, detail, symbol, color]) =>
+          `<article class="stat-card"><div class="stat-head"><span>${title}</span><span class="surface-icon ${color}">${icon(symbol)}</span></div><b class="stat-number">${note}</b><small>${detail}</small></article>`,
+      )
+      .join(""),
+  );
+  const percent = tasks.length
+    ? Math.round((100 * approved) / tasks.length)
+    : 0;
+  $("#completionRing").style.setProperty("--value", percent);
+  $("#completionPercent").textContent = percent + "%";
+  $("#completionLabel").textContent = tasks.length
+    ? `${approved}/${tasks.length} nhiệm vụ đã hoàn thành`
+    : "Chưa có nhiệm vụ đang mở";
+  const next = tasks
+    .filter((t) => ["not_submitted", "rejected"].includes(t.status))
+    .sort(
+      (a, b) =>
+        (a.status === "rejected" ? -1 : 0) -
+          (b.status === "rejected" ? -1 : 0) ||
+        (+dateValue(a.due_at) || Infinity) - (+dateValue(b.due_at) || Infinity),
+    )
+    .slice(0, 3);
+  $("#upcomingList").innerHTML = next.length
+    ? next
+        .map(
+          (t, i) =>
+            `<div class="upcoming-item"><span>${String(i + 1).padStart(2, "0")}</span><div><b title="${h(t.title)}">${h(t.title)}</b><small>${t.status === "rejected" ? "Cần nộp lại · " : ""}${t.due_at ? formatDate(t.due_at, true) : "Chưa đặt hạn chót"}</small></div><button class="icon-button" data-task-action="${t.id}" data-task-view="${canSubmit(t) ? "submit" : "files"}" aria-label="Mở nhiệm vụ ${h(t.title)}">${icon("arrow-right")}</button></div>`,
+        )
+        .join("")
+    : '<div class="empty-state compact"><b>Bạn đã cập nhật đủ bài nộp</b><p>Kết quả duyệt sẽ được cập nhật tại đây.</p></div>';
+}
+function renderTasks() {
+  const search = normalize($("#taskSearch").value),
+    status = $("#taskStatus").value,
+    deadlineFilter = $("#taskDeadline").value;
+  const tasks = state.tasks.filter(
+    (t) =>
+      (t.is_active || t.file_count) &&
+      normalize(t.title + " " + t.description).includes(search) &&
+      (status === "all" ||
+        (status === "incomplete"
+          ? t.status !== "approved"
+          : t.status === status)) &&
+      (deadlineFilter === "all" ||
+        (deadlineFilter === "archive" && !t.is_active) ||
+        (deadlineFilter === "overdue" && isExpired(t)) ||
+        (deadlineFilter === "soon" &&
+          t.is_active &&
+          t.due_at &&
+          !isExpired(t) &&
+          +dateValue(t.due_at) < Date.now() + 3 * 86400000)),
+  );
+  tasks.sort(
+    (a, b) =>
+      (+dateValue(a.due_at) || Infinity) - (+dateValue(b.due_at) || Infinity),
+  );
+  $("#taskSummary").textContent = `${tasks.length} nhiệm vụ phù hợp`;
+  loaded(
+    $("#taskList"),
+    tasks.length
+      ? tasks
+          .map(
+            (t) =>
+              `<article class="task-card"><div class="task-card-top">${badge(t.status)}${!t.is_active ? '<span class="muted"><small>Đã đóng</small></span>' : deadline(t)}</div><h2>${h(t.title)}</h2>${t.description ? `<p>${h(t.description)}</p>` : ""}${t.review_note ? `<div class="review-note"><b>Phản hồi:</b> ${h(t.review_note)}</div>` : ""}<div class="task-card-footer"><small>${t.file_count ? `${t.file_count} tệp đã gửi` : "Chưa có minh chứng"}</small><div class="action-row">${t.file_count ? `<button class="button ghost small" data-task-action="${t.id}" data-task-view="files">Xem bài</button>` : ""}${canSubmit(t) ? `<button class="button soft small" data-task-action="${t.id}" data-task-view="submit">${t.file_count ? "Bổ sung" : "Gửi minh chứng"} ${icon("arrow-right")}</button>` : ""}</div></div></article>`,
+          )
+          .join("")
+      : empty("Không có nhiệm vụ phù hợp", "Thử thay đổi từ khóa hoặc bộ lọc."),
+  );
+}
+function renderUploadTask() {
+  const task = selectedTask("#uploadTask");
+  $("#uploadTaskInfo").innerHTML = task
+    ? `${badge(task.status)} ${deadline(task)}${task.description ? `<p>${h(task.description)}</p>` : ""}${task.review_note ? `<p class="danger-text"><b>Phản hồi:</b> ${h(task.review_note)}</p>` : ""}${!canSubmit(task) ? '<p class="danger-text">Nhiệm vụ đã đóng hoặc hết hạn nhận bài.</p>' : ""}`
+    : "";
+  $("#submitButton").disabled = !canSubmit(task) || state.uploading;
+  $("#dropZone").setAttribute(
+    "aria-disabled",
+    String(!canSubmit(task) || state.uploading),
+  );
+}
+function renderSelected() {
+  $("#selectedWrap").hidden = !state.selected.length;
+  $("#selectedSummary").textContent =
+    `${state.selected.length} tệp · ${formatBytes(state.selected.reduce((n, r) => n + r.file.size, 0))}`;
+  $("#selectedFiles").innerHTML = state.selected
+    .map(
+      (r) =>
+        `<div class="selected-item">${r.url ? `<img src="${r.url}" alt="${h(r.file.name)}" data-preview-selected="${r.id}" tabindex="0" role="button" aria-label="Xem trước ${h(r.file.name)}">` : fileIcon(r.file)}<span class="selected-item-info"><b title="${h(r.file.name)}">${h(r.file.name)}</b><small>${formatBytes(r.file.size)}</small></span><div class="action-row"><button type="button" class="icon-button" data-replace-selected="${r.id}" aria-label="Thay tệp ${h(r.file.name)}">${icon("edit")}</button><button type="button" class="icon-button danger-text" data-remove-selected="${r.id}" aria-label="Bỏ chọn ${h(r.file.name)}">${icon("x")}</button></div></div>`,
+    )
+    .join("");
+}
+function addFiles(files, replaceId = null) {
+  if (state.uploading) return;
+  files = [...files];
+  if (!files.length) return;
+  const next = replaceId
+    ? state.selected
+        .filter((r) => r.id !== replaceId)
+        .map((r) => r.file)
+        .concat(files)
+    : state.selected.map((r) => r.file).concat(files);
+  const error = validateSelection(next);
+  if (error) {
+    toast(error, "error");
+    return;
+  }
+  if (replaceId) {
+    const old = state.selected.find((r) => r.id === replaceId);
+    if (old?.url) URL.revokeObjectURL(old.url);
+    state.selected = state.selected.filter((r) => r.id !== replaceId);
+  }
+  for (const file of files)
+    state.selected.push({
+      id: crypto.randomUUID(),
+      file,
+      url: fileKind(file).key === "image" ? URL.createObjectURL(file) : null,
+    });
+  renderSelected();
+  message("#uploadMessage", "");
+}
+function uploadProgress(value, label) {
+  $("#uploadProgressWrap").hidden = false;
+  $("#uploadProgress").value = value;
+  $("#uploadProgressValue").textContent = Math.round(value) + "%";
+  $("#uploadProgressLabel").textContent = label;
+}
+function sendUpload(body) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/me/upload");
+    xhr.setRequestHeader("X-Requested-With", "B1C14");
+    xhr.responseType = "json";
+    xhr.timeout = 180000;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = (100 * e.loaded) / e.total;
+        uploadProgress(
+          percent,
+          percent === 100
+            ? "Máy chủ đang kiểm tra và lưu tệp…"
+            : "Đang tải minh chứng lên…",
+        );
+      }
+    };
+    xhr.onload = () => {
+      const data = xhr.response || {};
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else {
+        if (data.code === "AUTH_REQUIRED") expireSession();
+        reject(
+          new Error(
+            data.error ||
+              "Chưa lưu được tệp. Hãy kiểm tra Tài liệu của tôi trước khi gửi lại.",
+          ),
+        );
+      }
+    };
+    xhr.onerror = () =>
+      reject(
+        new Error(
+          "Mất kết nối khi gửi. Kiểm tra Tài liệu của tôi trước khi thử lại để tránh gửi trùng.",
+        ),
+      );
+    xhr.ontimeout = () =>
+      reject(
+        new Error("Chờ quá lâu. Kiểm tra Tài liệu của tôi trước khi gửi lại."),
+      );
+    xhr.send(body);
+  });
+}
+async function upload(event) {
+  event.preventDefault();
+  if (state.uploading) return;
+  const task = selectedTask("#uploadTask");
+  if (!canSubmit(task)) {
+    toast("Nhiệm vụ không còn nhận bài.", "error");
+    return;
+  }
+  if (!state.selected.length) {
+    toast("Hãy chọn ít nhất một tệp.", "error");
+    return;
+  }
+  const epoch = state.epoch;
+  state.uploading = true;
+  $("#uploadFields").disabled = true;
+  $("#logoutButton").disabled = true;
+  message("#uploadMessage", "");
+  try {
+    await busy(
+      $("#submitButton"),
+      async () => {
+        const body = new FormData();
+        body.append("task_id", task.id);
+        let savings = 0;
+        for (let i = 0; i < state.selected.length; i++) {
+          const original = state.selected[i].file;
+          uploadProgress(
+            0,
+            `Đang chuẩn bị tệp ${i + 1}/${state.selected.length}…`,
+          );
+          const file = $("#compressImages").checked
+            ? await compressImage(original)
+            : original;
+          savings += original.size - file.size;
+          body.append("images", file);
+        }
+        const data = await sendUpload(body);
+        if (epoch !== state.epoch) return;
+        clearSelected();
+        metadataCache.clear();
+        uploadProgress(100, "Đã lưu minh chứng");
+        message(
+          "#uploadMessage",
+          data.message +
+            (savings ? ` Đã giảm ${formatBytes(savings)} nhờ nén ảnh.` : ""),
+        );
+        toast(data.message);
+        $("#filesTask").value = String(task.id);
+        await loadTasks();
+      },
+      "Đang gửi minh chứng…",
+    );
+  } catch (error) {
+    if (epoch === state.epoch) {
+      message("#uploadMessage", error.message, true);
+      toast(error.message, "error");
+      $("#uploadProgressLabel").textContent = "Gửi chưa hoàn tất";
+    }
+  } finally {
+    state.uploading = false;
+    $("#uploadFields").disabled = false;
+    $("#logoutButton").disabled = false;
+    renderUploadTask();
+  }
+}
+async function loadMyFiles(force = false) {
+  const id = Number($("#filesTask").value);
+  state.myFiles = [];
+  $("#submissionStatus").replaceChildren();
+  $("#reviewHistory").replaceChildren();
+  $("#myFileCount").textContent = "";
+  if (!id) {
+    loaded(
+      $("#myFilesGrid"),
+      empty(
+        "Chưa có tài liệu",
+        "Khi có nhiệm vụ, bạn có thể gửi minh chứng tại mục Gửi minh chứng.",
+      ),
+    );
+    return;
+  }
+  skeleton($("#myFilesGrid"), 4, "tile");
+  const key = `me:${state.member.id}:${id}`,
+    cached = metadataCache.get(key);
+  try {
+    await latest(
+      "files",
+      (signal) =>
+        !force && cached && Date.now() - cached.at < 15000
+          ? Promise.resolve(cached.data)
+          : api(`/api/me/submission?task_id=${id}`, { signal }),
+      (data) => {
+        if (Number($("#filesTask").value) !== id) return;
+        metadataCache.set(key, { data, at: Date.now() });
+        state.myFiles = data.images || [];
+        $("#myFileCount").textContent = `${state.myFiles.length} tệp`;
+        loaded(
+          $("#myFilesGrid"),
+          state.myFiles.length
+            ? state.myFiles
+                .map((f) => fileTile(f, canSubmit(taskById(id))))
+                .join("")
+            : empty(
+                "Chưa gửi minh chứng",
+                "Thêm tệp vào nhiệm vụ để bắt đầu.",
+                '<button class="button soft" data-task-action="' +
+                  id +
+                  '" data-task-view="submit">Gửi minh chứng</button>',
+              ),
+        );
+        const submission = data.submission;
+        $("#submissionStatus").innerHTML =
+          submission && state.myFiles.length
+            ? `<div class="submission-banner">${badge(submission.status)}<span class="muted">Cập nhật ${formatDate(submission.updated_at)}</span></div>${submission.review_note ? `<div class="review-note">${h(submission.review_note)}</div><br>` : ""}`
+            : "";
+        const history = data.history || [];
+        $("#reviewHistory").innerHTML = history.length
+          ? `<details class="review-history"><summary>Lịch sử duyệt (${history.length} lần gần nhất)</summary>${history.map((r) => `<div class="history-item">${badge(r.status)}<small>${formatDate(r.created_at)} · ${h(r.reviewer_name || "Quản lý")}</small>${r.note ? `<p>${h(r.note)}</p>` : ""}</div>`).join("")}</details>`
+          : "";
+      },
+    );
+  } catch (error) {
+    if (error.name !== "AbortError")
+      loaded(
+        $("#myFilesGrid"),
+        empty(
+          "Chưa tải được tài liệu",
+          error.message,
+          '<button class="button soft" data-refresh="files">Thử lại</button>',
+        ),
+      );
+    throw error;
+  }
+}
+async function removeFile(id) {
+  const file = state.myFiles.find((f) => f.id === id);
+  if (!file) return;
+  const result = await modal({
+    title: "Xóa tài liệu này?",
+    description: `${file.image_name}\nBài sẽ cần được duyệt lại sau khi thay đổi minh chứng.`,
+    submit: "Xóa tài liệu",
+    danger: true,
+    onSubmit: () => api(`/api/me/images?id=${id}`, { method: "DELETE" }),
+  });
+  if (result) {
+    metadataCache.clear();
+    toast("Đã xóa tài liệu.");
+    await Promise.all([loadTasks(), loadMyFiles(true)]);
+  }
+}
+async function loadManager() {
+  if (state.member?.role !== "cadre") return;
+  const id = Number($("#managerTask").value);
+  state.selectedReviews.clear();
+  state.members = [];
+  renderBulk();
+  state.managerTask = null;
+  [
+    "editTaskButton",
+    "toggleTaskButton",
+    "deleteTaskButton",
+    "exportExcel",
+    "exportZip",
+  ].forEach((key) => ($("#" + key).disabled = !id));
+  if (!id) {
+    $("#membersBody").innerHTML =
+      `<tr><td colspan="6">${empty("Chưa có nhiệm vụ", "Tạo nhiệm vụ đầu tiên để bắt đầu theo dõi.")}</td></tr>`;
+    $("#managerStats").replaceChildren();
+    $("#unitOverview").replaceChildren();
+    $("#managerTaskMeta").textContent = "";
+    $("#memberSummary").textContent = "";
+    return;
+  }
+  $("#membersBody").innerHTML =
+    '<tr><td colspan="6"><div class="skeleton line" aria-label="Đang tải thành viên"></div><div class="skeleton line"></div><div class="skeleton line"></div></td></tr>';
+  $("#membersBody").setAttribute("aria-busy", "true");
+  skeleton($("#unitOverview"), 4, "line");
+  try {
+    await latest(
+      "manager",
+      (signal) =>
+        Promise.all([
+          api(`/api/cadre/submissions?task_id=${id}`, { signal }),
+          api("/api/cadre/dashboard", { signal }),
+        ]),
+      ([data, overview]) => {
+        if (Number($("#managerTask").value) !== id) return;
+        state.members = data.members || [];
+        state.managerTask = data.task;
+        const stats = data.stats;
+        $("#managerTaskMeta").innerHTML =
+          `${data.task.is_active ? '<span class="badge approved">Đang mở</span>' : '<span class="badge not_submitted">Đã đóng</span>'} <span class="deadline">${data.task.due_at ? "Hạn chót: " + formatDate(data.task.due_at) : "Chưa đặt hạn chót"}</span>`;
+        $("#toggleTaskButton").textContent = data.task.is_active
+          ? "Đóng nhận bài"
+          : "Mở nhận bài";
+        $("#managerStats").innerHTML = [
+          ["Đạt", stats.approved, "green"],
+          ["Chờ duyệt", stats.pending, "orange"],
+          ["Chưa nộp", stats.not_submitted, ""],
+          ["Cần nộp lại", stats.rejected, "red"],
+        ]
+          .map(
+            ([label, n, color]) =>
+              `<div class="mini-stat ${color}"><b>${n}</b><small>${label}</small></div>`,
+          )
+          .join("");
+        loaded(
+          $("#unitOverview"),
+          overview.units.length
+            ? overview.units
+                .map((u) => {
+                  const percent = u.expected
+                    ? Math.round((100 * u.approved) / u.expected)
+                    : 0;
+                  return `<article class="unit-card"><b>${h(u.unit_label)}</b><div><span>${u.approved}/${u.expected} lượt hoàn thành</span><strong>${percent}%</strong></div><progress max="100" value="${percent}" aria-label="Tiến độ ${h(u.unit_label)}"></progress><small>Tất cả nhiệm vụ đang mở</small></article>`;
+                })
+                .join("")
+            : empty(
+                "Chưa có tiến độ chung",
+                "Thống kê xuất hiện khi có nhiệm vụ đang mở.",
+              ),
+        );
+        renderMembers();
+      },
+    );
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      loaded($("#unitOverview"), empty("Chưa tải được tiến độ", error.message));
+      $("#membersBody").removeAttribute("aria-busy");
+      $("#membersBody").innerHTML =
+        `<tr><td colspan="6">${empty("Chưa tải được danh sách", error.message, '<button class="button soft" data-refresh="manager">Thử lại</button>')}</td></tr>`;
+    }
+    throw error;
+  }
+}
+function filteredMembers() {
+  const search = normalize($("#memberSearch").value),
+    unit = $("#memberUnit").value,
+    status = $("#memberStatus").value;
+  return state.members.filter(
+    (m) =>
+      normalize(m.name).includes(search) &&
+      (unit === "all" || m.unit_code === unit) &&
+      (status === "all" || m.status === status),
+  );
+}
+function renderMembers() {
+  const members = filteredMembers(),
+    visible = new Set(
+      members.filter((m) => m.status === "pending").map((m) => m.id),
+    );
+  state.selectedReviews = new Set(
+    [...state.selectedReviews].filter((id) => visible.has(id)),
+  );
+  loaded(
+    $("#membersBody"),
+    members.length
+      ? members
+          .map(
+            (m) =>
+              `<tr><td class="checkbox-cell">${m.status === "pending" ? `<input type="checkbox" data-review-check="${m.id}" aria-label="Chọn bài của ${h(m.name)}" ${state.selectedReviews.has(m.id) ? "checked" : ""}>` : ""}</td><td><div class="member-cell"><span class="avatar">${initials(m.name)}</span><span><b>${h(m.name)}</b><small>${h(m.unit_label)}</small></span></div></td><td><span class="muted">${h(m.unit_label)}</span></td><td>${badge(m.status)}</td><td class="muted">${m.image_count ? formatDate(m.updated_at, true) : "—"}</td><td class="align-right">${m.image_count ? `<button class="button soft small" data-open-submission="${m.id}">${icon("folder")}${m.image_count} tệp</button>` : '<span class="muted">Chưa có tệp</span>'}</td></tr>`,
+          )
+          .join("")
+      : `<tr><td colspan="6">${empty("Không tìm thấy thành viên", "Thử đổi từ khóa hoặc bộ lọc.")}</td></tr>`,
+  );
+  $("#memberSummary").textContent =
+    `${members.length}/${state.members.length} thành viên · Chọn bài chờ duyệt để xử lý hàng loạt`;
+  renderBulk();
+}
+function renderBulk() {
+  const eligible = filteredMembers().filter((m) => m.status === "pending");
+  $("#bulkBar").hidden = !state.selectedReviews.size;
+  $("#selectedCount").textContent = `${state.selectedReviews.size} bài đã chọn`;
+  $("#selectAll").disabled = !eligible.length;
+  $("#selectAll").checked =
+    eligible.length > 0 &&
+    eligible.every((m) => state.selectedReviews.has(m.id));
+  $("#selectAll").indeterminate =
+    state.selectedReviews.size > 0 && !$("#selectAll").checked;
+}
+async function review(status) {
+  const items = state.members
+    .filter((m) => state.selectedReviews.has(m.id) && m.status === "pending")
+    .map((m) => ({ id: m.id, revision: m.revision }));
+  if (!items.length) return;
+  if (items.length > 50) {
+    toast("Mỗi lần duyệt tối đa 50 bài.", "error");
+    return;
+  }
+  const reject = status === "rejected";
+  const result = await modal({
+    title: reject
+      ? `Yêu cầu ${items.length} bài nộp lại?`
+      : `Duyệt đạt ${items.length} bài?`,
+    description: reject
+      ? "Phản hồi được gửi kèm trạng thái để thành viên biết cần chỉnh sửa gì."
+      : "Xác nhận bạn đã kiểm tra các minh chứng được chọn.",
+    submit: reject ? "Yêu cầu nộp lại" : "Duyệt đạt",
+    danger: reject,
+    fields: `<label class="field"><span>${reject ? "Lý do cần nộp lại" : "Ghi chú (không bắt buộc)"}</span><textarea name="note" maxlength="1000" ${reject ? "required" : ""} placeholder="Nhập phản hồi của bạn…"></textarea></label>`,
+    onSubmit: (fields) =>
+      api("/api/cadre/review", {
+        method: "POST",
+        body: { items, status, note: fields.note },
+      }),
+  });
+  if (result) {
+    metadataCache.clear();
+    toast(result.message, result.skipped.length ? "info" : "success");
+    await Promise.all([loadManager(), loadTasks()]);
+  }
+}
+async function gallery(id) {
+  const member = state.members.find((m) => m.id === id);
+  if (!member) return;
+  const dialog = $("#galleryDialog");
+  $("#galleryTitle").textContent = member.name;
+  $("#galleryMeta").textContent =
+    `${member.unit_label} · ${member.image_count} tệp · ${STATUS[member.status]}`;
+  state.gallery = [];
+  skeleton($("#galleryFiles"), 4, "tile");
+  if (!dialog.open) dialog.showModal();
+  const key = `gallery:${state.member.id}:${id}:${member.revision}`,
+    cached = metadataCache.get(key);
+  try {
+    await latest(
+      "gallery",
+      (signal) =>
+        cached && Date.now() - cached.at < 15000
+          ? Promise.resolve(cached.data)
+          : api(`/api/cadre/images?submission_id=${id}`, { signal }),
+      (data) => {
+        if (!dialog.open) return;
+        metadataCache.set(key, { data, at: Date.now() });
+        state.gallery = data.images || [];
+        loaded(
+          $("#galleryFiles"),
+          state.gallery.length
+            ? state.gallery.map((f) => fileTile(f)).join("")
+            : empty(
+                "Chưa có tệp",
+                "Hồ sơ vừa được thay đổi. Hãy làm mới danh sách.",
+              ),
+        );
+      },
+    );
+  } catch (error) {
+    if (error.name !== "AbortError")
+      loaded($("#galleryFiles"), empty("Chưa tải được tệp", error.message));
+    throw error;
+  }
+}
+function localDateInput(value) {
+  const d = dateValue(value);
+  if (!d) return "";
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+async function editTask(existing = null) {
+  const result = await modal({
+    title: existing ? "Chỉnh sửa nhiệm vụ" : "Tạo nhiệm vụ mới",
+    description:
+      "Thành viên có thể gửi hoặc sửa minh chứng khi nhiệm vụ đang mở và chưa quá hạn.",
+    submit: existing ? "Lưu thay đổi" : "Tạo nhiệm vụ",
+    fields: `<label class="field"><span>Tên nhiệm vụ</span><input name="title" minlength="3" maxlength="180" required value="${h(existing?.title || "")}" placeholder="Ví dụ: Báo cáo sinh hoạt tuần"></label><label class="field"><span>Yêu cầu / mô tả</span><textarea name="description" maxlength="2000" placeholder="Nêu rõ tài liệu cần nộp…">${h(existing?.description || "")}</textarea></label><label class="field"><span>Hạn chót (giờ trên thiết bị của bạn)</span><input name="due_at" type="datetime-local" value="${localDateInput(existing?.due_at)}"><small class="muted">Để trống nếu không giới hạn thời gian.</small></label>`,
+    onSubmit: (fields) =>
+      api("/api/tasks", {
+        method: "POST",
+        body: {
+          title: fields.title,
+          description: fields.description,
+          due_at: fields.due_at ? new Date(fields.due_at).toISOString() : null,
+          ...(existing ? { task_id: existing.id } : {}),
+        },
+      }),
+  });
+  if (result) {
+    toast(existing ? "Đã cập nhật nhiệm vụ." : "Đã tạo nhiệm vụ.");
+    await loadTasks();
+    $("#managerTask").value = result.task.id;
+    await loadManager();
+  }
+}
+async function toggleTask() {
+  const task = state.managerTask;
+  if (!task) return;
+  const result = await modal({
+    title: task.is_active ? "Đóng nhận minh chứng?" : "Mở lại nhiệm vụ?",
+    description: task.is_active
+      ? "Thành viên vẫn xem được bài cũ nhưng không thể thêm hoặc xóa tệp."
+      : isExpired(task)
+        ? "Nhiệm vụ đã hết hạn. Bạn cần sửa hạn chót để nhận thêm bài."
+        : "Thành viên có thể tiếp tục gửi minh chứng.",
+    submit: task.is_active ? "Đóng nhận bài" : "Mở nhiệm vụ",
+    onSubmit: () =>
+      api("/api/cadre/toggle-task", {
+        method: "POST",
+        body: { task_id: task.id, is_active: task.is_active ? 0 : 1 },
+      }),
+  });
+  if (result) {
+    toast(result.task.is_active ? "Đã mở nhiệm vụ." : "Đã đóng nhận bài.");
+    await loadTasks();
+    await loadManager();
+  }
+}
+async function deleteTask() {
+  const task = state.managerTask;
+  if (!task) return;
+  const result = await modal({
+    title: "Xóa nhiệm vụ và minh chứng?",
+    description: `Thao tác này xóa “${task.title}” cùng tất cả bài nộp. Không thể hoàn tác trong ứng dụng.`,
+    submit: "Xóa vĩnh viễn",
+    danger: true,
+    fields:
+      '<label class="field"><span>Nhập XÓA để xác nhận</span><input name="confirmation" autocomplete="off" required placeholder="XÓA"></label>',
+    onSubmit: (fields) => {
+      if (fields.confirmation !== "XÓA")
+        throw new Error("Hãy nhập đúng XÓA để xác nhận.");
+      return api(`/api/cadre/delete-task?task_id=${task.id}`, {
+        method: "DELETE",
+      });
+    },
+  });
+  if (result) {
+    metadataCache.clear();
+    toast(result.message);
+    await loadTasks();
+    await loadManager();
+  }
+}
+async function exportTask(format, button) {
+  const task = state.managerTask;
+  if (!task) return;
+  await busy(
+    button,
+    async () => {
+      // Direct navigation streams large ZIPs without buffering the whole archive in JS memory.
+      const anchor = document.createElement("a");
+      anchor.href = `/api/cadre/${format === "excel" ? "export-excel" : "export"}?task_id=${task.id}`;
+      anchor.target = "_blank";
+      anchor.rel = "noopener";
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      toast(
+        "Đã yêu cầu tải xuống. Nếu chưa có tệp, kiểm tra tab vừa mở.",
+        "info",
+      );
+    },
+    "Đang xuất…",
+  );
+}
+function bind() {
+  setupUi();
+  setupPreview();
+  updateThemeButtons();
+  try {
+    if (localStorage.getItem("b1-sidebar") === "collapsed")
+      document.documentElement.classList.add("collapsed");
+  } catch {}
+  $("#themeSelect").onchange = (e) => setTheme(e.target.value);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener(
+    "change",
+    updateThemeButtons,
+  );
+  $("#menuButton").onclick = openMenu;
+  $("#bottomMenu").onclick = openMenu;
+  $("#closeMenu").onclick = () => closeMenu();
+  $("#sidebarBackdrop").onclick = () => closeMenu();
+  window.addEventListener("resize", () => closeMenu(false));
+  document.addEventListener("keydown", (e) => {
+    if ($("#sidebar").classList.contains("open")) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeMenu();
+      }
+      if (e.key === "Tab") {
+        const nodes = [...$("#sidebar").querySelectorAll("a,button")].filter(
+          (n) => !n.hidden && n.getClientRects().length,
+        );
+        const first = nodes[0],
+          last = nodes.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     }
-    cadreSections.appendChild(card);
-  }
-
-  if (!shown && cadreSubmissions.length) showMessage(cadreDashboardMessage, 'Không tìm thấy kết quả khớp bộ lọc hiện tại.', 'error');
-}
-
-function resetFilePreview() {
-  filePreviewPanel.classList.add('hidden');
-  filePreviewStage.replaceChildren();
-  filePreviewName.textContent = 'Tài liệu';
-  filePreviewInfo.textContent = '';
-  fileOpenLink.removeAttribute('href');
-  fileDownloadLink.removeAttribute('href');
-}
-
-function renderGalleryTiles() {
-  galleryTiles.replaceChildren();
-  if (!galleryImages.length) {
-    galleryTiles.innerHTML = '<div class="empty-box"><strong>Chưa có tài liệu.</strong><span>Người này chưa gửi file trong task hiện tại.</span></div>';
-    return;
-  }
-  galleryImages.forEach(file => galleryTiles.appendChild(createFileTile(file)));
-}
-
-async function openGallery(item) {
-  galleryOwner = item;
-  galleryImages = [];
-  galleryTitle.textContent = item.name;
-  galleryMeta.textContent = `${item.unit_label} · đang tải danh sách tài liệu...`;
-  galleryTiles.innerHTML = '<div class="empty-box"><strong>Đang tải...</strong><span>Chỉ tải danh sách trước, nội dung file sẽ tải khi bạn bấm xem.</span></div>';
-  resetFilePreview();
-  galleryDialog.showModal();
-  try {
-    const data = await fetchJSON(`/api/cadre/images?submission_id=${encodeURIComponent(item.id)}`);
-    galleryImages = data.images || [];
-    galleryMeta.textContent = `${item.unit_label} · ${galleryImages.length} tài liệu · chế độ Tiles`;
-    renderGalleryTiles();
-  } catch (error) {
-    galleryMeta.textContent = error.message || 'Không thể tải tài liệu.';
-  }
-}
-
-function openPersonalFile(file) {
-  galleryOwner = { name: 'Tài liệu của tôi', unit_label: currentMember?.unit_label || '' };
-  galleryImages = [file];
-  galleryTitle.textContent = 'Tài liệu của tôi';
-  galleryMeta.textContent = `${currentMember?.unit_label || ''} · 1 tài liệu`;
-  renderGalleryTiles();
-  resetFilePreview();
-  galleryDialog.showModal();
-  selectGalleryFile(file);
-}
-
-function selectGalleryFile(file) {
-  if (!file) return;
-  const kind = fileKind(file);
-  const name = file.image_name || 'Tài liệu';
-  filePreviewPanel.classList.remove('hidden');
-  filePreviewName.textContent = name;
-  filePreviewInfo.textContent = `${kind.label} · ${formatBytes(file.image_size || 0)}${file.created_at ? ` · ${formatDate(file.created_at)}` : ''}`;
-  fileOpenLink.href = fileUrl(file, false);
-  fileDownloadLink.href = fileUrl(file, true);
-  filePreviewStage.replaceChildren();
-
-  if (kind.key === 'image') {
-    const img = document.createElement('img');
-    img.alt = name;
-    img.decoding = 'async';
-    img.src = fileUrl(file, false);
-    filePreviewStage.appendChild(img);
-  } else {
-    const message = document.createElement('div');
-    message.className = 'preview-message';
-    if (kind.key === 'pdf') {
-      message.innerHTML = '<strong>PDF sẵn sàng.</strong><br>Bấm “Mở file” để xem PDF trong tab riêng hoặc “Tải xuống” để lưu đúng định dạng.';
-    } else {
-      message.innerHTML = `<span class="file-icon ${kind.key}" style="margin:0 auto 14px">${kind.label}</span><strong>${kind.label} sẵn sàng.</strong><br>Trình duyệt không hiển thị trực tiếp định dạng Office. Hãy dùng “Tải xuống” để mở bằng ứng dụng tương ứng.`;
+    const image = e.target.closest("[data-preview-selected]");
+    if (image && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      image.click();
     }
-    filePreviewStage.appendChild(message);
-  }
-  filePreviewPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-/* Navigation */
-$$('[data-go-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.goView)));
-$$('.nav-item[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
-$('[data-nav-target="dashboard"]')?.addEventListener('click', event => { event.preventDefault(); showView('dashboard'); });
-sidebarToggle.addEventListener('click', () => {
-  document.body.classList.toggle('sidebar-collapsed');
-  localStorage.setItem('sidebar-collapsed', document.body.classList.contains('sidebar-collapsed') ? '1' : '0');
-});
-mobileMenuButton.addEventListener('click', () => sidebar.classList.add('open'));
-sidebarBackdrop.addEventListener('click', () => sidebar.classList.remove('open'));
-if (localStorage.getItem('sidebar-collapsed') === '1') document.body.classList.add('sidebar-collapsed');
-
-/* Auth */
-unitSelect.addEventListener('change', () => populateMemberSelect(unitSelect.value));
-loginForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (IS_LOCAL_FILE) return showMessage(loginMessage, 'Bản local chỉ dùng để xem giao diện. Hãy chạy trên Cloudflare để đăng nhập thật.', 'error');
-  const memberId = Number(memberSelect.value);
-  const password = passwordInput.value;
-  if (!unitSelect.value) return showMessage(loginMessage, 'Hãy chọn tiểu đội / nhóm.', 'error');
-  if (!memberId) return showMessage(loginMessage, 'Hãy chọn họ tên.', 'error');
-  if (!password) return showMessage(loginMessage, 'Hãy nhập mật khẩu.', 'error');
-
-  setButtonLoading(loginButton, true, 'Đang đăng nhập...');
-  showMessage(loginMessage, 'Đang xác thực tài khoản...');
-  try {
-    const data = await fetchJSON('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: memberId, password })
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("a[data-view]")) event.preventDefault();
+    return safeRun(async () => {
+      const target = event.target;
+      if (target.closest("[data-theme-cycle]")) {
+        const pref = document.documentElement.dataset.theme;
+        setTheme(
+          pref === "dark" ||
+            (pref === "system" &&
+              matchMedia("(prefers-color-scheme: dark)").matches)
+            ? "light"
+            : "dark",
+        );
+        return;
+      }
+      const nav = target.closest("[data-view]");
+      if (nav) {
+        event.preventDefault();
+        showView(nav.dataset.view);
+        return;
+      }
+      const action = target.closest("[data-task-action]");
+      if (action) {
+        const view = action.dataset.taskView,
+          id = action.dataset.taskAction;
+        $("#" + (view === "files" ? "filesTask" : "uploadTask")).value = id;
+        renderUploadTask();
+        showView(view);
+        return;
+      }
+      const refresh = target.closest("[data-refresh]");
+      if (refresh) {
+        await busy(
+          refresh,
+          async () => {
+            if (refresh.dataset.refresh === "files") await loadMyFiles(true);
+            else if (refresh.dataset.refresh === "manager") {
+              await loadTasks();
+              await loadManager();
+            } else await loadTasks();
+          },
+          "Đang tải…",
+        );
+        return;
+      }
+      const remove = target.closest("[data-remove-selected]");
+      if (remove && !state.uploading) {
+        const r = state.selected.find(
+          (f) => f.id === remove.dataset.removeSelected,
+        );
+        if (r?.url) URL.revokeObjectURL(r.url);
+        state.selected = state.selected.filter((f) => f !== r);
+        renderSelected();
+        return;
+      }
+      const replace = target.closest("[data-replace-selected]");
+      if (replace && !state.uploading) {
+        $("#replaceInput").dataset.replaceId = replace.dataset.replaceSelected;
+        $("#replaceInput").click();
+        return;
+      }
+      const selected = target.closest("[data-preview-selected]");
+      if (selected) {
+        const r = state.selected.find(
+          (f) => f.id === selected.dataset.previewSelected,
+        );
+        if (r)
+          openPreview({
+            name: r.file.name,
+            size: r.file.size,
+            url: r.url,
+            type: r.file.type,
+          });
+        return;
+      }
+      const fileButton = target.closest("[data-file-open]");
+      if (fileButton) {
+        const fromGallery = !!fileButton.closest("#galleryDialog");
+        const file = (fromGallery ? state.gallery : state.myFiles).find(
+          (f) => f.id === Number(fileButton.dataset.fileOpen),
+        );
+        if (file) openPreview(file);
+        return;
+      }
+      const removeUploaded = target.closest("[data-file-delete]");
+      if (removeUploaded) {
+        await removeFile(Number(removeUploaded.dataset.fileDelete));
+        return;
+      }
+      const open = target.closest("[data-open-submission]");
+      if (open) await gallery(Number(open.dataset.openSubmission));
     });
-    setSessionUI(data.member);
-    passwordInput.value = '';
-    await afterLogin();
-  } catch (error) {
-    showMessage(loginMessage, error.message || 'Đăng nhập thất bại.', 'error');
-  } finally {
-    setButtonLoading(loginButton, false);
-  }
-});
-
-logoutButton.addEventListener('click', async () => {
-  if (!IS_LOCAL_FILE) await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-  currentMember = null;
-  tasks = [];
-  cadreTasks = [];
-  cadreSubmissions = [];
-  clearPreviews();
-  setSessionUI(null);
-  taskSelect.innerHTML = '<option value="">Đăng nhập để xem task</option>';
-  cadreTaskSelect.innerHTML = '<option value="">Đăng nhập để xem task</option>';
-  cadreSections.replaceChildren();
-  unitSelect.value = '';
-  populateMemberSelect('');
-  passwordInput.value = '';
-  showMessage(loginMessage, 'Đã đăng xuất.', 'success');
-  history.replaceState?.(null, '', location.pathname);
-});
-
-/* Upload */
-chooseFilesButton.addEventListener('click', event => { event.preventDefault(); imagesInput.click(); });
-imagesInput.addEventListener('change', renderSelectedFiles);
-['dragenter', 'dragover'].forEach(type => uploadBox.addEventListener(type, event => { event.preventDefault(); uploadBox.classList.add('dragover'); }));
-['dragleave', 'drop'].forEach(type => uploadBox.addEventListener(type, event => { event.preventDefault(); uploadBox.classList.remove('dragover'); }));
-uploadBox.addEventListener('drop', event => {
-  const files = [...(event.dataTransfer.files || [])].slice(0, MAX_FILES);
-  if (!files.length) return;
-  const dt = new DataTransfer();
-  files.forEach(file => dt.items.add(file));
-  imagesInput.files = dt.files;
-  renderSelectedFiles();
-});
-
-taskSelect.addEventListener('change', async () => {
-  await Promise.all([loadStats(Number(taskSelect.value)), loadMySubmission()]);
-});
-refreshMySubmission.addEventListener('click', () => loadMySubmission().catch(error => showMessage(mySubmissionMessage, error.message, 'error')));
-
-uploadForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (IS_LOCAL_FILE) return showMessage(uploadMessage, 'Bản local không thể gửi dữ liệu thật.', 'error');
-  const files = [...imagesInput.files];
-  const error = validateFiles(files);
-  if (!taskSelect.value) return showMessage(uploadMessage, 'Hãy chọn task cần minh chứng.', 'error');
-  if (error) return showMessage(uploadMessage, error, 'error');
-
-  const body = new FormData();
-  body.append('task_id', taskSelect.value);
-  files.forEach(file => body.append('images', file));
-  setButtonLoading(submitButton, true, 'Đang gửi...');
-  showMessage(uploadMessage, `Đang tải ${files.length} tài liệu lên hệ thống...`);
-  try {
-    const data = await fetchJSON('/api/me/upload', { method: 'POST', body });
-    showMessage(uploadMessage, data.message || 'Đã gửi minh chứng.', 'success');
-    imagesInput.value = '';
-    clearPreviews();
-    await Promise.all([loadStats(Number(taskSelect.value)), loadMySubmission()]);
-    if (currentMember?.role === 'cadre') await fetchCadreSubmissions();
-  } catch (error) {
-    showMessage(uploadMessage, error.message || 'Không thể gửi minh chứng.', 'error');
-  } finally {
-    setButtonLoading(submitButton, false);
-  }
-});
-
-myImagesGrid.addEventListener('click', async event => {
-  const openButton = event.target.closest('[data-file-open]');
-  if (openButton) {
-    const id = Number(openButton.dataset.fileOpen);
-    const taskId = Number(taskSelect.value);
-    if (!id || !taskId) return;
+  });
+  $("#unitSelect").onchange = () => {
+    const group = state.roster.find((g) => g.code === $("#unitSelect").value);
+    $("#memberSelect").disabled = !group;
+    $("#memberSelect").innerHTML =
+      '<option value="">Chọn họ và tên</option>' +
+      (group?.members || [])
+        .map((m) => `<option value="${m.id}">${h(m.name)}</option>`)
+        .join("");
+  };
+  $("#retryLogin").onclick = () => safeRun(loadRoster);
+  $("#loginForm").onsubmit = async (event) => {
+    event.preventDefault();
+    message("#loginMessage", "");
     try {
-      const data = await fetchJSON(`/api/me/submission?task_id=${encodeURIComponent(taskId)}`);
-      const file = (data.images || []).find(item => Number(item.id) === id);
-      if (file) openPersonalFile(file);
+      await busy(
+        $("#loginButton"),
+        async () => {
+          const data = await api("/api/auth/login", {
+            method: "POST",
+            body: {
+              member_id: Number($("#memberSelect").value),
+              password: $("#passwordInput").value,
+            },
+          });
+          $("#passwordInput").value = "";
+          activate(data.member);
+          showView("dashboard", { load: false });
+          await loadTasks();
+        },
+        "Đang đăng nhập…",
+      );
     } catch (error) {
-      showMessage(mySubmissionMessage, error.message, 'error');
+      message("#loginMessage", error.message, true);
+      if (state.member) toast(error.message, "error");
     }
+  };
+  $("#logoutButton").onclick = () =>
+    safeRun(async () => {
+      if (state.uploading) return;
+      await busy(
+        $("#logoutButton"),
+        async () => {
+          await api("/api/auth/logout", { method: "POST" });
+          expireSession();
+        },
+        "Đang đăng xuất…",
+      );
+    });
+  $("#uploadForm").onsubmit = upload;
+  $("#uploadTask").onchange = renderUploadTask;
+  const choose = () => {
+    if (canSubmit(selectedTask("#uploadTask")) && !state.uploading)
+      $("#fileInput").click();
+    else toast("Hãy chọn nhiệm vụ còn nhận bài.", "info");
+  };
+  $("#dropZone").onclick = choose;
+  $("#dropZone").onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      choose();
+    }
+  };
+  ["dragenter", "dragover"].forEach((name) =>
+    $("#dropZone").addEventListener(name, (e) => {
+      e.preventDefault();
+      if (!state.uploading) $("#dropZone").classList.add("dragover");
+    }),
+  );
+  ["dragleave", "drop"].forEach((name) =>
+    $("#dropZone").addEventListener(name, (e) => {
+      e.preventDefault();
+      $("#dropZone").classList.remove("dragover");
+    }),
+  );
+  $("#dropZone").addEventListener("drop", (e) => {
+    if (canSubmit(selectedTask("#uploadTask"))) addFiles(e.dataTransfer.files);
+  });
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", (e) => e.preventDefault());
+  $("#fileInput").onchange = (e) => {
+    addFiles(e.target.files);
+    e.target.value = "";
+  };
+  $("#cameraButton").onclick = () => $("#cameraInput").click();
+  $("#cameraInput").onchange = (e) => {
+    addFiles(e.target.files);
+    e.target.value = "";
+  };
+  $("#replaceInput").onchange = (e) => {
+    addFiles(e.target.files, e.target.dataset.replaceId);
+    e.target.value = "";
+  };
+  $("#clearSelected").onclick = clearSelected;
+  $("#filesTask").onchange = () => safeRun(() => loadMyFiles());
+  ["taskSearch", "taskStatus", "taskDeadline"].forEach((id) =>
+    $("#" + id).addEventListener(
+      id === "taskSearch" ? "input" : "change",
+      renderTasks,
+    ),
+  );
+  ["memberSearch", "memberUnit", "memberStatus"].forEach((id) =>
+    $("#" + id).addEventListener(
+      id === "memberSearch" ? "input" : "change",
+      renderMembers,
+    ),
+  );
+  $("#managerTask").onchange = () => safeRun(loadManager);
+  $("#newTaskButton").onclick = () => safeRun(() => editTask());
+  $("#editTaskButton").onclick = () =>
+    safeRun(() => state.managerTask && editTask(state.managerTask));
+  $("#toggleTaskButton").onclick = () => safeRun(toggleTask);
+  $("#deleteTaskButton").onclick = () => safeRun(deleteTask);
+  $("#selectAll").onchange = (e) => {
+    state.selectedReviews = e.target.checked
+      ? new Set(
+          filteredMembers()
+            .filter((m) => m.status === "pending")
+            .slice(0, 50)
+            .map((m) => m.id),
+        )
+      : new Set();
+    renderMembers();
+  };
+  $("#membersBody").onchange = (e) => {
+    if (e.target.dataset.reviewCheck) {
+      const id = Number(e.target.dataset.reviewCheck);
+      if (e.target.checked) {
+        if (state.selectedReviews.size >= 50) {
+          e.target.checked = false;
+          toast("Mỗi lần chọn tối đa 50 bài.", "info");
+          return;
+        }
+        state.selectedReviews.add(id);
+      } else state.selectedReviews.delete(id);
+      renderBulk();
+    }
+  };
+  $("#clearReviewSelection").onclick = () => {
+    state.selectedReviews.clear();
+    renderMembers();
+  };
+  $("#bulkApprove").onclick = () => safeRun(() => review("approved"));
+  $("#bulkReject").onclick = () => safeRun(() => review("rejected"));
+  $("#exportExcel").onclick = () =>
+    safeRun(() => exportTask("excel", $("#exportExcel")));
+  $("#exportZip").onclick = () =>
+    safeRun(() => exportTask("zip", $("#exportZip")));
+  $("#galleryDialog").addEventListener("close", () => {
+    requests.get("gallery")?.abort();
+    state.gallery = [];
+    $("#galleryFiles").replaceChildren();
+  });
+  $("#passwordForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const button = e.target.querySelector('[type="submit"]');
+    message("#passwordMessage", "");
+    try {
+      await busy(
+        button,
+        async () => {
+          const data = await api("/api/auth/change-password", {
+            method: "POST",
+            body: {
+              current_password: $("#currentPassword").value,
+              new_password: $("#newPassword").value,
+              confirm_password: $("#confirmPassword").value,
+            },
+          });
+          e.target.reset();
+          state.member.is_default_password = false;
+          $("#defaultPasswordBanner").hidden = true;
+          message("#passwordMessage", data.message);
+          toast(data.message);
+        },
+        "Đang lưu…",
+      );
+    } catch (error) {
+      message("#passwordMessage", error.message, true);
+    }
+  };
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted)
+      state.selected.forEach((r) => r.url && URL.revokeObjectURL(r.url));
+  });
+}
+async function init() {
+  bind();
+  if (location.protocol === "file:") {
+    message(
+      "#loginMessage",
+      "Ứng dụng cần chạy qua Cloudflare Pages hoặc máy chủ phát triển. Mở trực tiếp HTML sẽ không kết nối được tài khoản và dữ liệu.",
+      true,
+    );
     return;
   }
-
-  const deleteButton = event.target.closest('[data-file-delete]');
-  if (!deleteButton) return;
-  const imageId = Number(deleteButton.dataset.fileDelete);
-  if (!imageId || !confirm('Bạn muốn xóa tài liệu này khỏi hồ sơ của mình?')) return;
-  deleteButton.disabled = true;
   try {
-    const data = await fetchJSON(`/api/me/images?id=${encodeURIComponent(imageId)}`, { method: 'DELETE' });
-    showMessage(mySubmissionMessage, data.remaining === 0 ? 'Đã xóa tài liệu cuối cùng trong task này.' : 'Đã xóa tài liệu thành công.', 'success');
-    await Promise.all([loadStats(Number(taskSelect.value)), loadMySubmission()]);
-    if (currentMember?.role === 'cadre') await fetchCadreSubmissions();
+    const data = await api("/api/auth/me");
+    if (data.member) {
+      activate(data.member);
+      showView("dashboard", { load: false });
+      await loadTasks();
+      const requested = location.hash.slice(1);
+      if (
+        document.body.dataset.entry === "manager" &&
+        data.member.role === "cadre"
+      )
+        showView("manager");
+      else if (requested && Object.hasOwn(VIEWS, requested))
+        showView(requested);
+    } else await loadRoster();
   } catch (error) {
-    showMessage(mySubmissionMessage, error.message || 'Không thể xóa tài liệu.', 'error');
-    deleteButton.disabled = false;
+    if (state.member) {
+      toast(error.message, "error");
+    } else {
+      await loadRoster();
+      message("#loginMessage", error.message, true);
+    }
   }
-});
-
-/* Account */
-changePasswordForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (IS_LOCAL_FILE) return showMessage(passwordMessage, 'Bản local không hỗ trợ đổi mật khẩu.', 'error');
-  const button = changePasswordForm.querySelector('button[type="submit"]');
-  setButtonLoading(button, true, 'Đang đổi...');
-  try {
-    const data = await fetchJSON('/api/auth/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ current_password: currentPassword.value, new_password: newPassword.value, confirm_password: confirmPassword.value })
-    });
-    showMessage(passwordMessage, data.message || 'Đổi mật khẩu thành công.', 'success');
-    currentPassword.value = '';
-    newPassword.value = '';
-    confirmPassword.value = '';
-    if (currentMember) currentMember.is_default_password = false;
-    defaultPasswordBanner.classList.add('hidden');
-  } catch (error) {
-    showMessage(passwordMessage, error.message || 'Không thể đổi mật khẩu.', 'error');
-  } finally {
-    setButtonLoading(button, false);
-  }
-});
-
-/* Manager */
-createTaskForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (!newTaskTitle.value.trim()) return showMessage(cadreTaskMessage, 'Hãy nhập tên task mới.', 'error');
-  const button = createTaskForm.querySelector('button');
-  setButtonLoading(button, true, 'Đang tạo...');
-  try {
-    const data = await fetchJSON('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newTaskTitle.value })
-    });
-    showMessage(cadreTaskMessage, `Đã tạo task: ${data.task.title}`, 'success');
-    newTaskTitle.value = '';
-    await Promise.all([loadTasks(false), loadTasks(true)]);
-    cadreTaskSelect.value = String(data.task.id);
-    if ([...taskSelect.options].some(option => option.value === String(data.task.id))) taskSelect.value = String(data.task.id);
-    await loadCadreDashboard();
-  } catch (error) {
-    showMessage(cadreTaskMessage, error.message || 'Không thể tạo task.', 'error');
-  } finally {
-    setButtonLoading(button, false);
-  }
-});
-
-cadreTaskSelect.addEventListener('change', async () => { updateCadreToggleButton(); await loadCadreDashboard(); });
-refreshCadreButton.addEventListener('click', () => loadCadreDashboard().catch(error => showMessage(cadreDashboardMessage, error.message, 'error')));
-
-toggleTaskButton.addEventListener('click', async () => {
-  const task = cadreTasks.find(item => String(item.id) === String(cadreTaskSelect.value));
-  if (!task) return;
-  const next = Number(task.is_active) ? 0 : 1;
-  setButtonLoading(toggleTaskButton, true, next ? 'Đang mở...' : 'Đang đóng...');
-  try {
-    const data = await fetchJSON('/api/cadre/toggle-task', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task_id: task.id, is_active: next })
-    });
-    showMessage(cadreTaskMessage, `${next ? 'Đã mở' : 'Đã đóng'} task: ${data.task.title}`, 'success');
-    await Promise.all([loadTasks(false), loadTasks(true)]);
-    cadreTaskSelect.value = String(task.id);
-    await loadCadreDashboard();
-  } catch (error) {
-    showMessage(cadreTaskMessage, error.message || 'Không thể đổi trạng thái task.', 'error');
-  } finally {
-    setButtonLoading(toggleTaskButton, false);
-  }
-});
-
-deleteTaskButton.addEventListener('click', async () => {
-  const task = cadreTasks.find(item => String(item.id) === String(cadreTaskSelect.value));
-  if (!task) return;
-  if (!confirm(`Xóa task "${task.title}"?\n\nToàn bộ tài liệu trong task này sẽ bị xóa vĩnh viễn.`)) return;
-  if (!confirm(`XÁC NHẬN LẦN CUỐI\n\nTask: ${task.title}\n\nSau thao tác này không thể khôi phục.`)) return;
-
-  setButtonLoading(deleteTaskButton, true, 'Đang xóa...');
-  showMessage(cadreTaskMessage, 'Đang xóa task và toàn bộ tài liệu...');
-  try {
-    const data = await fetchJSON(`/api/cadre/delete-task?task_id=${encodeURIComponent(task.id)}`, { method: 'DELETE' });
-    showMessage(cadreTaskMessage, `Đã xóa "${data.deleted_task}" và ${data.deleted_images} tài liệu.`, 'success');
-    await Promise.all([loadTasks(false), loadTasks(true)]);
-    await loadCadreDashboard();
-    await loadMySubmission();
-  } catch (error) {
-    showMessage(cadreTaskMessage, error.message || 'Không thể xóa task.', 'error');
-  } finally {
-    setButtonLoading(deleteTaskButton, false);
-  }
-});
-
-exportZipButton.addEventListener('click', () => {
-  const taskId = Number(cadreTaskSelect.value);
-  if (!taskId) return;
-  window.location.href = `/api/cadre/export?task_id=${encodeURIComponent(taskId)}`;
-});
-
-filterTabs.forEach(button => button.addEventListener('click', () => {
-  currentFilterUnit = button.dataset.unit;
-  filterTabs.forEach(tab => tab.classList.toggle('active', tab === button));
-  renderCadreSections();
-}));
-cadreSearchInput.addEventListener('input', renderCadreSections);
-
-/* Explorer dialog */
-galleryTiles.addEventListener('click', event => {
-  const button = event.target.closest('[data-file-open]');
-  if (!button) return;
-  const file = galleryImages.find(item => Number(item.id) === Number(button.dataset.fileOpen));
-  if (file) selectGalleryFile(file);
-});
-closeGalleryButton.addEventListener('click', () => galleryDialog.close());
-galleryDialog.addEventListener('click', event => {
-  const rect = galleryDialog.getBoundingClientRect();
-  const outside = event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
-  if (outside) galleryDialog.close();
-});
-
-window.addEventListener('beforeunload', clearPreviewUrls);
-
-async function init() {
-  try {
-    await loadRoster();
-  } catch (error) {
-    showMessage(loginMessage, error.message || 'Không tải được danh sách tài khoản.', 'error');
-  }
-  await loadSession();
 }
-
 init();

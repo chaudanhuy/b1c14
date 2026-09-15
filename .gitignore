@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+.build/
+.qa/
+.dev.vars
+.env
+tests/artifacts/
+*.zip

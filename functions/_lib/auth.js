@@ -1,90 +1,108 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-const COOKIE_NAME = 'th_session';
-
-// Các học viên được cấp quyền quản lý tương đương cán bộ trung đội.
-// Dùng name_key để quyền không phụ thuộc dấu tiếng Việt hay tên hiển thị.
-const MANAGER_NAME_KEYS = new Set([
-  'chau dan huy',
-  'nguyen duc an',
-  'nguyen quang dieu',
-  'thai thanh phong',
-  'tran le loi',
-  'tran hoang kien',
-  'trinh long vu'
-]);
+const COOKIE_NAME = "th_session";
 
 export function hasManagementAccess(member) {
-  const nameKey = String(member?.name_key || '').trim().toLowerCase();
-  return Number(member?.can_manage) === 1 || MANAGER_NAME_KEYS.has(nameKey);
+  return Number(member?.can_manage) === 1;
+}
+
+export function publicMember(member) {
+  return {
+    id: member.id,
+    unit_code: member.unit_code,
+    unit_label: member.unit_label,
+    name: member.name,
+    role: hasManagementAccess(member) ? "cadre" : "member",
+    is_default_password: !!member.is_default_password,
+  };
 }
 
 function bytesToBase64Url(bytes) {
-  let binary = '';
+  let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 function base64UrlToBytes(value) {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
   const binary = atob(padded);
-  return Uint8Array.from(binary, char => char.charCodeAt(0));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 async function importHmacKey(secret, usage) {
   return crypto.subtle.importKey(
-    'raw',
+    "raw",
     encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
+    { name: "HMAC", hash: "SHA-256" },
     false,
-    usage
+    usage,
   );
 }
 
 async function signValue(value, secret) {
-  const key = await importHmacKey(secret, ['sign']);
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(value));
+  const key = await importHmacKey(secret, ["sign"]);
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(value),
+  );
   return bytesToBase64Url(new Uint8Array(signature));
 }
 
 async function verifyValue(value, signature, secret) {
   try {
-    const key = await importHmacKey(secret, ['verify']);
+    const key = await importHmacKey(secret, ["verify"]);
     const signatureBytes = base64UrlToBytes(signature);
-    return await crypto.subtle.verify('HMAC', key, signatureBytes, encoder.encode(value));
+    return await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signatureBytes,
+      encoder.encode(value),
+    );
   } catch {
     return false;
   }
 }
 
 function parseCookies(request) {
-  const header = request.headers.get('Cookie') || '';
+  const header = request.headers.get("Cookie") || "";
   return Object.fromEntries(
     header
-      .split(';')
-      .map(part => part.trim())
+      .split(";")
+      .map((part) => part.trim())
       .filter(Boolean)
-      .map(part => {
-        const index = part.indexOf('=');
-        if (index === -1) return [part, ''];
-        return [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
-      })
+      .map((part) => {
+        const index = part.indexOf("=");
+        if (index === -1) return [part, ""];
+        try {
+          return [
+            part.slice(0, index),
+            decodeURIComponent(part.slice(index + 1)),
+          ];
+        } catch {
+          return [part.slice(0, index), ""];
+        }
+      }),
   );
 }
 
 export function getSessionSecret(env) {
-  return env.SESSION_SECRET || env.ADMIN_SECRET || '';
+  return env.SESSION_SECRET || env.ADMIN_SECRET || "";
 }
 
 export async function createSession(member, env, hours = 24 * 14) {
   const secret = getSessionSecret(env);
-  if (!secret) throw new Error('Thiếu SESSION_SECRET hoặc ADMIN_SECRET trên Cloudflare.');
+  if (!secret)
+    throw new Error("Thiếu SESSION_SECRET hoặc ADMIN_SECRET trên Cloudflare.");
   const payload = {
     member_id: Number(member.id),
-    unit_code: member.unit_code,
-    role: hasManagementAccess(member) ? 'cadre' : 'member',
-    exp: Math.floor(Date.now() / 1000) + (hours * 60 * 60)
+    sv: Number(member.session_version || 0),
+    v: 5,
+    exp: Math.floor(Date.now() / 1000) + hours * 60 * 60,
   };
   const body = bytesToBase64Url(encoder.encode(JSON.stringify(payload)));
   const signature = await signValue(body, secret);
@@ -92,26 +110,35 @@ export async function createSession(member, env, hours = 24 * 14) {
 }
 
 export function sessionCookie(token, request, maxAge = 60 * 60 * 24 * 14) {
-  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
 }
 
 export function clearSessionCookie(request) {
-  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`;
 }
 
 export async function getSessionPayload(request, env) {
   const token = parseCookies(request)[COOKIE_NAME];
   const secret = getSessionSecret(env);
-  if (!token || !secret) return null;
-  const [body, signature] = token.split('.');
+  if (!token || token.length > 2048 || !secret || token.split(".").length !== 2)
+    return null;
+  const [body, signature] = token.split(".");
   if (!body || !signature) return null;
   if (!(await verifyValue(body, signature, secret))) return null;
 
   try {
     const payload = JSON.parse(decoder.decode(base64UrlToBytes(body)));
-    if (!payload?.member_id || Number(payload.exp) <= Math.floor(Date.now() / 1000)) return null;
+    if (
+      payload?.v !== 5 ||
+      !Number.isSafeInteger(payload.member_id) ||
+      payload.member_id < 1 ||
+      !Number.isSafeInteger(payload.sv) ||
+      !Number.isSafeInteger(payload.exp) ||
+      payload.exp <= Math.floor(Date.now() / 1000)
+    )
+      return null;
     return payload;
   } catch {
     return null;
@@ -121,7 +148,8 @@ export async function getSessionPayload(request, env) {
 export async function getAuthenticatedMember(request, env) {
   const payload = await getSessionPayload(request, env);
   if (!payload) return null;
-  const member = await env.DB.prepare(`
+  const member = await env.DB.prepare(
+    `
     SELECT
       id,
       unit_code,
@@ -130,22 +158,35 @@ export async function getAuthenticatedMember(request, env) {
       name_key,
       is_default_password,
       can_manage,
+      session_version,
       updated_at
     FROM members
     WHERE id = ?
     LIMIT 1
-  `).bind(payload.member_id).first();
-  if (!member) return null;
+  `,
+  )
+    .bind(payload.member_id)
+    .first();
+  if (!member || member.session_version !== payload.sv) return null;
   return {
     ...member,
-    role: hasManagementAccess(member) ? 'cadre' : 'member'
+    role: hasManagementAccess(member) ? "cadre" : "member",
   };
 }
 
 export async function requireAuth(request, env) {
   const member = await getAuthenticatedMember(request, env);
   if (!member) {
-    return { ok: false, response: Response.json({ error: 'Bạn chưa xác thực tài khoản.' }, { status: 401 }) };
+    return {
+      ok: false,
+      response: Response.json(
+        {
+          error: "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.",
+          code: "AUTH_REQUIRED",
+        },
+        { status: 401 },
+      ),
+    };
   }
   return { ok: true, member };
 }
@@ -153,20 +194,77 @@ export async function requireAuth(request, env) {
 export async function requireCadre(request, env) {
   const result = await requireAuth(request, env);
   if (!result.ok) return result;
-  if (result.member.role !== 'cadre') {
-    return { ok: false, response: Response.json({ error: 'Chức năng này chỉ dành cho cán bộ trung đội.' }, { status: 403 }) };
+  if (result.member.role !== "cadre") {
+    return {
+      ok: false,
+      response: Response.json(
+        { error: "Chức năng này chỉ dành cho cán bộ trung đội." },
+        { status: 403 },
+      ),
+    };
   }
   return result;
 }
 
-export async function hashPassword(password, salt) {
-  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(`${salt}|${password}`));
-  return bytesToBase64Url(new Uint8Array(digest));
+const PASSWORD_ITERATIONS = 100000;
+
+export function needsPasswordUpgrade(hash) {
+  return !String(hash).startsWith("pbkdf2-sha256$");
+}
+
+export async function hashPassword(
+  password,
+  salt,
+  iterations = PASSWORD_ITERATIONS,
+) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: encoder.encode(salt), iterations },
+    key,
+    256,
+  );
+  return `pbkdf2-sha256$${iterations}$${bytesToBase64Url(new Uint8Array(bits))}`;
 }
 
 export async function verifyPassword(password, salt, expectedHash) {
-  const hashed = await hashPassword(password, salt);
-  return hashed === expectedHash;
+  let hashed;
+  if (String(expectedHash).startsWith("pbkdf2-sha256$")) {
+    const parts = expectedHash.split("$");
+    const iterations = Number(parts[1]);
+    if (
+      parts.length !== 3 ||
+      !Number.isInteger(iterations) ||
+      iterations < 10000 ||
+      iterations > PASSWORD_ITERATIONS
+    )
+      return false;
+    hashed = await hashPassword(password, salt, iterations);
+  } else {
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(`${salt}|${password}`),
+    );
+    hashed = bytesToBase64Url(new Uint8Array(digest));
+  }
+  // Avoid an early-exit string comparison on the derived hash.
+  const key = await importHmacKey(salt, ["sign", "verify"]);
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(hashed),
+  );
+  return crypto.subtle.verify(
+    "HMAC",
+    key,
+    signature,
+    encoder.encode(String(expectedHash)),
+  );
 }
 
 export function generateSalt(length = 16) {
