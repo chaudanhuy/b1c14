@@ -45,6 +45,8 @@ export async function onRequest(context) {
       { status: error instanceof HttpError ? error.status : 500 },
     );
   }
+  // Keep the upgraded socket: cloning it as an ordinary response drops WebSocket state.
+  if (response.status === 101 && response.webSocket) return response;
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "same-origin");

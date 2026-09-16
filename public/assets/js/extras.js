@@ -1,4 +1,5 @@
 import { escapeHTML as h, icon, toast, modal, busy } from './ui.js';
+import { communityTiles } from './community.js';
 
 const endpoint = '/api/extras/';
 const stamp = value => new Date(value).toLocaleString('vi-VN', { timeZone:'Asia/Ho_Chi_Minh', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
@@ -10,7 +11,7 @@ const blank = text => `<div class="extras-empty">${h(text)}</div>`;
 const textInput = (name,label,value='',max=160) => `<label class="field"><span>${label}</span><input name="${name}" maxlength="${max}" required value="${h(value)}"></label>`;
 const area = (name,label,value='',max=8000,required=true) => `<label class="field"><span>${label}</span><textarea name="${name}" maxlength="${max}" ${required?'required':''}>${h(value)}</textarea></label>`;
 
-export function createExtras({ api, getMember, isActive }) {
+export function createExtras({ community, api, getMember, isActive }) {
   const root = document.getElementById('extrasRoot');
   let screen='hub', box='inbox', page=0, period='upcoming', version=0, session=0;
   let controller=new AbortController(), summarySequence=0, rows=[], currentMail=null, recipients=[];
@@ -37,6 +38,7 @@ export function createExtras({ api, getMember, isActive }) {
     return `<div class="extras-head"><div>${back?button('hub','← Tiện ích','ghost small'):'<span class="extras-eyebrow">KHÔNG GIAN TIỆN ÍCH</span>'}<h1>${h(title)}</h1><p class="muted">${h(description)}</p></div><div class="action-row">${actions}</div></div>`;
   }
   function begin(next, title, description, actions='') {
+    community.unmount();
     controller.abort(); controller=new AbortController(); screen=next; version++;
     root.innerHTML=header(title,description,next!=='hub',actions)+'<div class="extras-loading panel" aria-busy="true"><div class="skeleton line"></div><div class="skeleton line"></div><div class="skeleton line"></div></div>';
     return version;
@@ -61,7 +63,7 @@ export function createExtras({ api, getMember, isActive }) {
       <button class="extras-tile" data-extra="mail"><span class="extras-symbol">${mailIcon}</span><strong>Hộp thư</strong><p>Gửi lời nhắn cho một người hoặc toàn bộ thành viên.</p><span class="extras-count"><span data-extra-count="unread_mail">…</span> thư chưa đọc →</span></button>
       <button class="extras-tile" data-extra="events"><span class="extras-symbol">${icon('clock')}</span><strong>Đếm ngược sự kiện</strong><p>Những mốc đáng nhớ, lịch thi và kế hoạch của riêng bạn.</p><span class="extras-count"><span data-extra-count="upcoming_events">…</span> sự kiện sắp tới →</span></button>
       <button class="extras-tile" data-extra="notices"><span class="extras-symbol">${bellIcon}</span><strong>Bảng thông báo</strong><p>Cập nhật thông tin chung và xác nhận khi bạn đã đọc.</p><span class="extras-count"><span data-extra-count="unread_notices">…</span> thông báo chưa đọc →</span></button>
-      </div><p class="extras-help">Thư được gửi trong website. Số lượng chưa đọc tự cập nhật mỗi phút khi bạn mở mục Thêm.</p>`;
+      ${communityTiles}</div><p class="extras-help">Thư được gửi trong website. Số lượng chưa đọc tự cập nhật mỗi phút khi bạn mở mục Thêm.</p>`;
     void summary();
   }
   async function mailList(reset=false) {
@@ -227,6 +229,8 @@ export function createExtras({ api, getMember, isActive }) {
     const action=target.dataset.extra, item=rows.find(r=>r.id===target.dataset.id);
     void run(async()=>{
       if(action==='hub')return hub();
+      if(action==='lqa'){begin('lqa','LQA-Message','');community.mountChat(root,hub);return;}
+      if(action==='links'){begin('links','Liên kết nhanh','');community.mountLinks(root,hub);return;}
       if(action==='mail') {box='inbox';return mailList(true);}
       if(action==='mail-back')return mailList(true);
       if(action==='inbox'||action==='sent'){box=action;return mailList(true);}
@@ -255,7 +259,7 @@ export function createExtras({ api, getMember, isActive }) {
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();if(isActive())void summary();}});
   return {
     open(){if(!allowed())return;active=true;hub();},
-    close(){active=false;version++;controller.abort();},
-    reset(){session++;version++;active=false;controller.abort();rows=[];recipients=[];currentMail=null;draft=null;edit=null;writing=false;root.replaceChildren();},
+    close(){community.unmount();active=false;version++;controller.abort();},
+    reset(){community.unmount();session++;version++;active=false;controller.abort();rows=[];recipients=[];currentMail=null;draft=null;edit=null;writing=false;root.replaceChildren();},
   };
 }

@@ -27,6 +27,7 @@ import {
 } from "./files.js";
 
 import { createExtras } from "./extras.js";
+import { createCommunity } from "./community.js";
 
 // Quy ước hiển thị: có ít nhất một tệp là hoàn thành.
 // Không cập nhật trạng thái trong D1 và không gọi API kiểm duyệt.
@@ -102,7 +103,8 @@ const VIEWS = {
   journey: "Hành trình",
   more: "Thêm",
 };
-const extras = createExtras({ api, getMember: () => state.member, isActive: () => state.view === "more" && !!state.member && !state.member.must_change_password });
+const community = createCommunity({ api, getMember: () => state.member });
+const extras = createExtras({ community, api, getMember: () => state.member, isActive: () => state.view === "more" && !!state.member && !state.member.must_change_password });
 const safeRun = (fn) =>
   Promise.resolve()
     .then(fn)
@@ -197,6 +199,7 @@ function clearSelected() {
 function expireSession() {
   state.epoch++;
   extras.reset();
+  community.reset();
   abortRequests();
   metadataCache.clear();
   clearSelected();
@@ -1062,6 +1065,7 @@ async function exportTask(format, button) {
   );
 }
 function updatePasswordRequirement() {
+  community.sync();
   const required = !!state.member?.must_change_password;
   $("#defaultPasswordBanner").hidden = !required && !state.member?.is_default_password;
   $("#defaultPasswordBanner p").textContent = required
@@ -1428,6 +1432,8 @@ function bind() {
           state.member.is_default_password = false;
           state.member.must_change_password = false;
           if (data.member) state.member = data.member;
+          community.reset();
+          community.sync();
           $("#passwordResetPanel").hidden = !state.member.can_reset_password;
           safeRun(loadTasks);
           if (state.member.can_reset_password) safeRun(loadResetMembers);
