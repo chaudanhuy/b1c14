@@ -157,6 +157,11 @@ async function api(url, { body, method = "GET", signal, ...options } = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (data.code === "AUTH_REQUIRED") expireSession();
+    if (data.code === "PASSWORD_CHANGE_REQUIRED" && state.member) {
+      state.member.must_change_password = true;
+      showView("account", { load: false });
+      updatePasswordRequirement();
+    }
     throw new Error(data.error || `Yêu cầu thất bại (${response.status}).`);
   }
   return data;
@@ -192,6 +197,11 @@ function expireSession() {
   abortRequests();
   metadataCache.clear();
   clearSelected();
+  clearPasswordReset();
+  $("#resetMemberSelect").replaceChildren();
+  $("#passwordResetPanel").hidden = true;
+  $("#passwordForm").reset();
+  $("#dialogFields").replaceChildren();
   state.member = null;
   state.tasks = [];
   state.members = [];
@@ -278,6 +288,8 @@ function showView(view, { load = true } = {}) {
     (view === "manager" && state.member.role !== "cadre")
   )
     view = "dashboard";
+  if (state.member.must_change_password) view = "account";
+  if (view !== "account") clearPasswordReset();
   state.view = view;
   if (view === "journey") updateJourney();
   $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== view));
@@ -294,6 +306,8 @@ function showView(view, { load = true } = {}) {
   $("#mainContent").focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: "instant" });
   if (load) {
+    if (view === "account" && state.member.can_reset_password && !state.member.must_change_password)
+      safeRun(loadResetMembers);
     if (view === "files") safeRun(() => loadMyFiles());
     else if (view === "manager") safeRun(loadManager);
     else if (view === "tasks" || view === "dashboard") safeRun(loadTasks);
@@ -314,7 +328,8 @@ function activate(member) {
   );
   $("#accountRole").textContent =
     member.role === "cadre" ? "Quyền quản lý" : "Học viên";
-  $("#defaultPasswordBanner").hidden = !member.is_default_password;
+  updatePasswordRequirement();
+  $("#passwordResetPanel").hidden = !member.can_reset_password || member.must_change_password;
   $("#greeting").textContent =
     `Chào ${member.name.split(" ").slice(-2).join(" ")}!`;
   $("#todayLabel").textContent = new Date().toLocaleDateString("vi-VN", {
@@ -361,7 +376,7 @@ function fillTasks(node, tasks, label) {
   if (tasks.some((t) => String(t.id) === old)) node.value = old;
 }
 async function loadTasks() {
-  if (!state.member) return;
+  if (!state.member || state.member.must_change_password) return;
   if (!state.tasks.length) {
     skeleton($("#dashboardStats"), 4, "tile");
     skeleton($("#taskList"), 4, "tile");
@@ -598,6 +613,11 @@ function sendUpload(body) {
       if (xhr.status >= 200 && xhr.status < 300) resolve(data);
       else {
         if (data.code === "AUTH_REQUIRED") expireSession();
+    if (data.code === "PASSWORD_CHANGE_REQUIRED" && state.member) {
+      state.member.must_change_password = true;
+      showView("account", { load: false });
+      updatePasswordRequirement();
+    }
         reject(
           new Error(
             data.error ||
@@ -775,7 +795,7 @@ async function removeFile(id) {
   }
 }
 async function loadManager() {
-  if (state.member?.role !== "cadre") return;
+  if (state.member?.role !== "cadre" || state.member.must_change_password) return;
   const id = Number($("#managerTask").value);
   state.selectedReviews.clear();
   state.members = [];
@@ -1036,10 +1056,97 @@ async function exportTask(format, button) {
     "Đang xuất…",
   );
 }
+function updatePasswordRequirement() {
+  const required = !!state.member?.must_change_password;
+  $("#defaultPasswordBanner").hidden = !required && !state.member?.is_default_password;
+  $("#defaultPasswordBanner p").textContent = required
+    ? "Bạn đang dùng mật khẩu tạm. Hãy đổi mật khẩu trước khi tiếp tục."
+    : "Bạn đang dùng mật khẩu mặc định. Hãy đổi để bảo vệ tài khoản.";
+}
+function clearPasswordReset() {
+  $("#resetTemporaryPassword").value = "";
+  $("#resetPasswordTarget").textContent = "";
+  $("#resetPasswordResult").hidden = true;
+}
+async function loadResetMembers() {
+  if (!state.member?.can_reset_password || state.member.must_change_password) return;
+  const epoch = state.epoch;
+  const select = $("#resetMemberSelect");
+  select.disabled = true;
+  $("#resetPasswordButton").disabled = true;
+  message("#resetPasswordMessage", "Đang tải danh sách…");
+  try {
+    const data = await api("/api/cadre/reset-password");
+    if (epoch !== state.epoch || !state.member?.can_reset_password) return;
+    select.innerHTML = '<option value="">Chọn thành viên…</option>' + data.members.map(
+      (m) => `<option value="${m.id}">${h(m.name)} · ${h(m.unit_label)}</option>`,
+    ).join("");
+    select.disabled = false;
+    $("#resetPasswordButton").disabled = !data.members.length;
+    message("#resetPasswordMessage", "");
+  } catch (error) {
+    if (epoch === state.epoch) message("#resetPasswordMessage", error.message, true);
+  }
+}
+async function resetMemberPassword(event) {
+  event.preventDefault();
+  if (!state.member?.can_reset_password || state.member.must_change_password) return;
+  const select = $("#resetMemberSelect");
+  const id = Number(select.value);
+  if (!id) return;
+  const epoch = state.epoch;
+  clearPasswordReset();
+  const result = await modal({
+    title: "Đặt lại mật khẩu thành viên?",
+    description: `${select.selectedOptions[0].textContent}. Các phiên đăng nhập cũ của người này sẽ bị thu hồi.`,
+    submit: "Tạo mật khẩu tạm",
+    fields: '<label class="field"><span>Mật khẩu hiện tại của Châu Đan Huy</span><input name="current_password" type="password" autocomplete="current-password" maxlength="256" required /></label>',
+    onSubmit: async (fields) => {
+      try {
+        return await api("/api/cadre/reset-password", {
+          method: "POST", body: { member_id: id, current_password: fields.current_password },
+        });
+      } finally {
+        const input = $("#dialogFields [name=current_password]");
+        if (input) input.value = "";
+        fields.current_password = "";
+      }
+    },
+  });
+  if (!result || epoch !== state.epoch || !state.member?.can_reset_password) return;
+  // Discard any delayed result if the owner has left the account screen.
+  if (state.view !== "account") return;
+  $("#resetPasswordTarget").textContent = `Đã đặt lại: ${result.member.name} · ${result.member.unit_label}`;
+  $("#resetTemporaryPassword").value = result.temporary_password;
+  $("#resetPasswordResult").hidden = false;
+  message("#resetPasswordMessage", result.message);
+  $("#resetTemporaryPassword").focus();
+}
+
 function bind() {
   setupUi();
   setupPreview();
   setupJourney();
+  $("#passwordResetForm").onsubmit = (event) => {
+    event.preventDefault();
+    return safeRun(() => resetMemberPassword(event));
+  };
+  $("#dismissTemporaryPassword").onclick = clearPasswordReset;
+  $("#copyTemporaryPassword").onclick = () => safeRun(async () => {
+    const input = $("#resetTemporaryPassword");
+    if (!input.value) return;
+    try {
+      await navigator.clipboard.writeText(input.value);
+      toast("Đã sao chép mật khẩu tạm.");
+    } catch {
+      input.focus(); input.select();
+      toast("Hãy sao chép phần mật khẩu đang được chọn.", "info");
+    }
+  });
+  $("#actionDialog").addEventListener("close", () => {
+    const input = $("#dialogFields [name=current_password]");
+    if (input) input.value = "";
+  });
   updateThemeButtons();
   try {
     if (localStorage.getItem("b1-sidebar") === "collapsed")
@@ -1314,6 +1421,11 @@ function bind() {
           });
           e.target.reset();
           state.member.is_default_password = false;
+          state.member.must_change_password = false;
+          if (data.member) state.member = data.member;
+          $("#passwordResetPanel").hidden = !state.member.can_reset_password;
+          safeRun(loadTasks);
+          if (state.member.can_reset_password) safeRun(loadResetMembers);
           $("#defaultPasswordBanner").hidden = true;
           message("#passwordMessage", data.message);
           toast(data.message);
@@ -1325,6 +1437,7 @@ function bind() {
     }
   };
   window.addEventListener("pagehide", (event) => {
+    clearPasswordReset();
     if (!event.persisted)
       state.selected.forEach((r) => r.url && URL.revokeObjectURL(r.url));
   });

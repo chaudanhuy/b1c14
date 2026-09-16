@@ -1,5 +1,6 @@
 import {
   createSession,
+  publicMember,
   generateSalt,
   hashPassword,
   requireAuth,
@@ -43,7 +44,7 @@ export async function onRequestPost({ request, env }) {
   const salt = generateSalt();
   const hash = await hashPassword(password, salt);
   const result = await env.DB.prepare(
-    `UPDATE members SET password_salt = ?, password_hash = ?, is_default_password = 0,
+    `UPDATE members SET password_salt = ?, password_hash = ?, is_default_password = 0, must_change_password = 0,
     session_version = session_version + 1, updated_at = ? WHERE id = ? AND password_hash = ? AND session_version = ?`,
   )
     .bind(
@@ -60,7 +61,8 @@ export async function onRequestPost({ request, env }) {
   member.session_version += 1;
   const token = await createSession(member, env);
   return Response.json(
-    { ok: true, message: "Đã đổi mật khẩu và đăng xuất các phiên khác." },
+    { ok: true, message: "Đã đổi mật khẩu và đăng xuất các phiên khác.",
+      member: publicMember({ ...member, is_default_password: 0, must_change_password: 0 }) },
     { headers: { "Set-Cookie": sessionCookie(token, request) } },
   );
 }

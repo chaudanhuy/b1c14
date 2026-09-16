@@ -6,6 +6,12 @@ export function hasManagementAccess(member) {
   return Number(member?.can_manage) === 1;
 }
 
+// Fixed account identity from the existing roster; never trust a name sent by the browser.
+export function hasPasswordResetAccess(member) {
+  return member?.name_key === "chau dan huy" && member?.unit_code === "1"
+    && hasManagementAccess(member) && !member.must_change_password;
+}
+
 export function publicMember(member) {
   return {
     id: member.id,
@@ -14,6 +20,8 @@ export function publicMember(member) {
     name: member.name,
     role: hasManagementAccess(member) ? "cadre" : "member",
     is_default_password: !!member.is_default_password,
+    must_change_password: !!member.must_change_password,
+    can_reset_password: hasPasswordResetAccess(member),
   };
 }
 
@@ -157,6 +165,7 @@ export async function getAuthenticatedMember(request, env) {
       name,
       name_key,
       is_default_password,
+      must_change_password,
       can_manage,
       session_version,
       updated_at
@@ -186,6 +195,18 @@ export async function requireAuth(request, env) {
         },
         { status: 401 },
       ),
+    };
+  }
+  const path = new URL(request.url).pathname.replace(/\/+$/, "");
+  if (member.must_change_password && ![
+    "/api/auth/change-password", "/api/auth/logout",
+  ].includes(path)) {
+    return {
+      ok: false,
+      response: Response.json({
+        error: "Bạn cần đổi mật khẩu tạm trước khi sử dụng các chức năng khác.",
+        code: "PASSWORD_CHANGE_REQUIRED",
+      }, { status: 403 }),
     };
   }
   return { ok: true, member };

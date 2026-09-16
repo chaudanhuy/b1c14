@@ -741,6 +741,31 @@
                 </form>
               </article>
             </div>
+            <article id="passwordResetPanel" class="panel" data-reset-owner-only hidden style="margin-top: 24px">
+              <div class="panel-heading">
+                <div><h2>Đặt lại mật khẩu thành viên</h2>
+                  <p>Chỉ dành cho Châu Đan Huy. Thành viên phải đổi mật khẩu tạm khi đăng nhập.</p></div>
+                <span class="surface-icon indigo" data-icon="shield"></span>
+              </div>
+              <form id="passwordResetForm" class="stack-form">
+                <label class="field"><span>Thành viên cần hỗ trợ</span>
+                  <select id="resetMemberSelect" required disabled><option value="">Đang tải danh sách…</option></select>
+                </label>
+                <button id="resetPasswordButton" type="submit" class="button primary" disabled>Đặt lại mật khẩu</button>
+                <p id="resetPasswordMessage" class="inline-message" role="status"></p>
+              </form>
+              <div id="resetPasswordResult" class="stack-form" hidden>
+                <p id="resetPasswordTarget"></p>
+                <label class="field"><span>Mật khẩu tạm — sao chép và gửi riêng cho thành viên</span>
+                  <input id="resetTemporaryPassword" type="text" readonly autocomplete="off" spellcheck="false" aria-label="Mật khẩu tạm" />
+                </label>
+                <p class="muted">Mật khẩu chỉ được hiển thị trong lần đặt lại này. Sau khi đóng, bạn không thể xem lại.</p>
+                <div class="action-row">
+                  <button id="copyTemporaryPassword" class="button soft" type="button">Sao chép</button>
+                  <button id="dismissTemporaryPassword" class="button ghost" type="button">Đã lưu · Đóng</button>
+                </div>
+              </div>
+            </article>
           </section>
         </main>
         <footer class="app-footer">
