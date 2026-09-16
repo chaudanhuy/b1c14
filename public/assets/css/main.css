@@ -2799,30 +2799,7 @@ progress::-webkit-progress-value {
   object-fit: contain;
 }
 
-.login-help {
-  margin-top: 14px;
-  padding: 0 4px;
 
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.login-help-item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-
-  font-size: 12.5px;
-  color: #64748b;
-}
-
-.login-help-item [data-icon] {
-  width: 14px;
-  height: 14px;
-  min-width: 14px;
-  color: #818cf8;
-}
 /* Hành trình: chỉ áp dụng trong màn hình mới. */
 .journey-card { padding: clamp(22px, 4vw, 44px); overflow: hidden; }
 .journey-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
