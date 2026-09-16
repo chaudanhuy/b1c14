@@ -19,8 +19,9 @@
     <section id="loginScreen" class="login-screen" aria-label="Đăng nhập">
       <div class="login-story">
         <a class="brand" href="/"
-          ><span class="brand-mark">31</span
-          ><span><b>ĐH31LQA</b><small>ĐẠI ĐỘI 14</small></span></a
+          ><span class="brand-mark"><img src="/assets/logo.jpg" alt="Logo đơn vị" />
+          </span>
+          <span><b>ĐH31LQA</b><small>ĐẠI ĐỘI 14</small></span></a
         >
         <div class="login-copy">
           <span class="eyebrow">CỔNG THÔNG TIN NỘI BỘ</span>
@@ -139,8 +140,8 @@
             href="#dashboard"
             data-view="dashboard"
             title="Tổng quan"
-            ><span class="brand-mark">31</span
-            ><span class="sidebar-copy"
+            ><span class="brand-mark"><img src="/assets/logo.jpg" alt="Logo đơn vị" />
+            </span><span class="sidebar-copy"
               ><b>ĐH31LQA</b><small>CỔNG NỘI BỘ</small></span
             ></a
           ><button
@@ -170,6 +171,9 @@
             <span data-icon="folder"></span
             ><span class="nav-text">Tài liệu của tôi</span>
           </button>
+          <button class="nav-item" data-view="journey" title="Hành trình">
+            <span data-icon="activity"></span><span class="nav-text">Hành trình</span>
+          </button>
           <span class="nav-label" data-manager-only hidden>QUẢN LÝ ĐƠN VỊ</span>
           <button
             class="nav-item"
@@ -185,6 +189,9 @@
           ><button class="nav-item" data-view="account" title="Tài khoản">
             <span data-icon="settings"></span
             ><span class="nav-text">Tài khoản</span>
+          </button>
+          <button id="moreSidebarButton" class="nav-item" type="button" title="Thêm">
+            <span data-icon="plus"></span><span class="nav-text">Thêm</span>
           </button>
         </nav>
         <div class="sidebar-foot">
@@ -282,7 +289,7 @@
                   <div>
                     <h3 id="completionLabel">Đang tải tiến độ…</h3>
                     <p class="muted">
-                      Hoàn thành khi minh chứng được duyệt đạt.
+                      Hoàn thành khi có ít nhất một tệp minh chứng.
                     </p>
                     <button class="button soft" data-view="tasks">
                       Xem nhiệm vụ <span data-icon="arrow-right"></span>
@@ -333,7 +340,7 @@
                 <span class="eyebrow">CÔNG VIỆC CÁ NHÂN</span>
                 <h1>Nhiệm vụ của tôi</h1>
                 <p class="muted">
-                  Theo dõi hạn chót và kết quả duyệt minh chứng.
+                  Theo dõi hạn chót và tiến độ nộp minh chứng.
                 </p>
               </div>
               <button class="button soft" data-refresh="tasks">
@@ -353,9 +360,7 @@
               ><select id="taskStatus">
                 <option value="all">Tất cả trạng thái</option>
                 <option value="not_submitted">Chưa nộp</option>
-                <option value="pending">Chờ duyệt</option>
-                <option value="approved">Đạt</option>
-                <option value="rejected">Cần nộp lại</option>
+                <option value="approved">Hoàn thành</option>
                 <option value="incomplete">Chưa hoàn thành</option></select
               ><label class="sr-only" for="taskDeadline">Lọc hạn chót</label
               ><select id="taskDeadline">
@@ -374,7 +379,7 @@
                 <span class="eyebrow">MINH CHỨNG CÁ NHÂN</span>
                 <h1>Gửi minh chứng</h1>
                 <p class="muted">
-                  Chọn nhiệm vụ, thêm tài liệu và gửi để được duyệt.
+                  Chọn nhiệm vụ và gửi minh chứng để hoàn thành.
                 </p>
               </div>
               <button class="button soft" data-view="files">
@@ -498,10 +503,9 @@
                       >
                     </li>
                     <li>
-                      <b>Gửi và chờ duyệt</b
+                      <b>Gửi là hoàn thành</b
                       ><span
-                        >Kết quả và phản hồi xuất hiện trong Nhiệm vụ của
-                        tôi.</span
+                        >Nộp thành công ít nhất một tệp là hoàn thành nhiệm vụ.</span
                       >
                     </li>
                   </ol>
@@ -541,7 +545,7 @@
               </div>
               <div id="submissionStatus"></div>
               <div id="myFilesGrid" class="file-grid"></div>
-              <div id="reviewHistory"></div>
+              <div id="reviewHistory" hidden></div>
             </article>
           </section>
           <section data-panel="manager" class="view" hidden>
@@ -550,7 +554,7 @@
                 <span class="eyebrow">QUẢN LÝ ĐƠN VỊ</span>
                 <h1>Quản lý minh chứng</h1>
                 <p class="muted">
-                  Nắm tiến độ chung và xử lý các bài đang chờ duyệt.
+                  Nắm tiến độ chung và xem minh chứng của thành viên.
                 </p>
               </div>
               <button id="newTaskButton" class="button primary">
@@ -606,39 +610,14 @@
                   <option value="3">Tiểu đội 3</option></select
                 ><select id="memberStatus" aria-label="Lọc bài nộp">
                   <option value="all">Tất cả trạng thái</option>
-                  <option value="pending">Chờ duyệt</option>
-                  <option value="not_submitted">Chưa nộp</option>
-                  <option value="approved">Đạt</option>
-                  <option value="rejected">Cần nộp lại</option>
-                </select>
-              </div>
-              <div id="bulkBar" class="bulk-bar" hidden>
-                <b id="selectedCount">0 bài đã chọn</b>
-                <div class="action-row">
-                  <button id="bulkApprove" class="button success small">
-                    <span data-icon="check"></span> Duyệt đạt</button
-                  ><button id="bulkReject" class="button danger small">
-                    Yêu cầu nộp lại</button
-                  ><button
-                    id="clearReviewSelection"
-                    class="icon-button"
-                    aria-label="Bỏ chọn bài"
-                  >
-                    <span data-icon="x"></span>
-                  </button>
-                </div>
+                    <option value="not_submitted">Chưa nộp</option>
+                  <option value="approved">Hoàn thành</option>
+                  </select>
               </div>
               <div class="table-wrap">
                 <table class="member-table">
                   <thead>
                     <tr>
-                      <th class="checkbox-cell">
-                        <input
-                          id="selectAll"
-                          type="checkbox"
-                          aria-label="Chọn các bài chờ duyệt đang hiển thị"
-                        />
-                      </th>
                       <th>THÀNH VIÊN</th>
                       <th>TIỂU ĐỘI</th>
                       <th>TRẠNG THÁI</th>
@@ -659,6 +638,34 @@
                   </button>
                 </div>
               </div>
+            </article>
+          </section>
+          <section data-panel="journey" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">MỖI NGÀY MỘT BƯỚC TRƯỞNG THÀNH</span>
+                <h1>Hành trình</h1>
+                <p class="muted">Từng ngày rèn luyện, thêm một bước gần ngày tốt nghiệp.</p>
+              </div>
+            </div>
+            <article class="panel journey-card" aria-labelledby="journeyHeading">
+              <div class="journey-heading">
+                <div><span class="eyebrow">NĂNG LƯỢNG HÀNH TRÌNH</span><h2 id="journeyHeading">Kiên trì hôm nay, vững vàng ngày mai</h2></div>
+                <strong id="journeyPercent" class="journey-percent">0,00%</strong>
+              </div>
+              <div id="journeyBar" class="journey-energy" role="progressbar" aria-label="Tiến độ từ ngày nhập ngũ đến ngày tốt nghiệp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="journeyFill" class="journey-energy-fill"></div>
+              </div>
+              <div class="journey-dates">
+                <span>Ngày nhập ngũ: <b>08/09/2024</b></span>
+                <span>Ngày tốt nghiệp: <b>08/2028</b></span>
+              </div>
+              <div class="journey-metrics">
+                <div><strong id="journeyElapsed">0</strong><span>Ngày đã trải qua</span></div>
+                <div><strong id="journeyRemaining">0</strong><span>Ngày đến tốt nghiệp</span></div>
+              </div>
+              <p id="journeyMessage" class="muted"></p>
+              <p class="journey-note muted">Mốc tính: 01/08/2028 · Giờ Việt Nam · Tự cập nhật theo đồng hồ thiết bị.</p>
             </article>
           </section>
           <section data-panel="account" class="view" hidden>

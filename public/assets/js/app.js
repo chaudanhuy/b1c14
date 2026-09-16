@@ -7,8 +7,6 @@ import {
   formatBytes,
   formatDate,
   dateValue,
-  badge,
-  STATUS,
   icon,
   empty,
   skeleton,
@@ -27,6 +25,56 @@ import {
   openPreview,
   setupPreview,
 } from "./files.js";
+
+// Quy ước hiển thị: có ít nhất một tệp là hoàn thành.
+// Không cập nhật trạng thái trong D1 và không gọi API kiểm duyệt.
+const STATUS = { not_submitted: "Chưa nộp", approved: "Hoàn thành" };
+function badge(status) {
+  const key = status === "approved" ? "approved" : "not_submitted";
+  return `<span class="badge ${key}">${STATUS[key]}</span>`;
+}
+function submissionStatus(record) {
+  return Number(record?.file_count ?? record?.image_count ?? 0) > 0
+    ? "approved"
+    : "not_submitted";
+}
+
+const JOURNEY_START = Date.parse("2024-09-08T00:00:00+07:00");
+const JOURNEY_END = Date.parse("2028-08-01T00:00:00+07:00");
+function updateJourney() {
+  const now = Date.now();
+  const day = 86400000;
+  const percent = Math.max(0, Math.min(100,
+    ((now - JOURNEY_START) / (JOURNEY_END - JOURNEY_START)) * 100));
+  const elapsed = Math.max(0, Math.floor((now - JOURNEY_START) / day));
+  const remaining = Math.max(0, Math.ceil((JOURNEY_END - now) / day));
+  const label = percent.toLocaleString("vi-VN", {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  }) + "%";
+  $("#journeyPercent").textContent = label;
+  $("#journeyFill").style.width = percent + "%";
+  $("#journeyBar").setAttribute("aria-valuenow", percent.toFixed(2));
+  $("#journeyBar").setAttribute("aria-valuetext", label + " hành trình đã hoàn thành");
+  $("#journeyElapsed").textContent = elapsed.toLocaleString("vi-VN");
+  $("#journeyRemaining").textContent = remaining.toLocaleString("vi-VN");
+  $("#journeyMessage").textContent = now < JOURNEY_START
+    ? "Hành trình đang chờ ngày bắt đầu."
+    : now >= JOURNEY_END
+      ? "Đã chạm mốc tốt nghiệp. Một hành trình mới đang đón bạn!"
+      : "Từng ngày nỗ lực đều đưa bạn gần hơn với đích đến.";
+}
+function setupJourney() {
+  $("#moreSidebarButton").onclick = () =>
+    toast("Các tiện ích mới sẽ được bổ sung tại đây.", "info");
+  window.setInterval(() => {
+    if (state.member && state.view === "journey" && !document.hidden)
+      updateJourney();
+  }, 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && state.member && state.view === "journey")
+      updateJourney();
+  });
+}
 
 const state = {
   member: null,
@@ -51,6 +99,7 @@ const VIEWS = {
   files: "Tài liệu của tôi",
   manager: "Quản lý minh chứng",
   account: "Tài khoản",
+  journey: "Hành trình",
 };
 const safeRun = (fn) =>
   Promise.resolve()
@@ -230,6 +279,7 @@ function showView(view, { load = true } = {}) {
   )
     view = "dashboard";
   state.view = view;
+  if (view === "journey") updateJourney();
   $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== view));
   $$("[data-view]").forEach((button) => {
     const active = button.dataset.view === view;
@@ -353,7 +403,7 @@ async function loadTasks() {
         renderTasks();
         renderUploadTask();
         $("#navTaskCount").textContent = state.tasks.filter(
-          (t) => t.is_active && t.status !== "approved",
+          (t) => t.is_active && submissionStatus(t) !== "approved",
         ).length;
       },
     );
@@ -375,10 +425,9 @@ async function loadTasks() {
 }
 function renderDashboard() {
   const tasks = state.tasks.filter((t) => t.is_active),
-    approved = tasks.filter((t) => t.status === "approved").length,
-    pending = tasks.filter((t) => t.status === "pending").length,
+    approved = tasks.filter((t) => submissionStatus(t) === "approved").length,
     missing = tasks.filter(
-      (t) => t.status === "not_submitted" || t.status === "rejected",
+      (t) => submissionStatus(t) === "not_submitted",
     ).length;
   const cards = [
     [
@@ -391,12 +440,12 @@ function renderDashboard() {
     [
       "Đã hoàn thành",
       approved,
-      "Minh chứng được duyệt đạt",
+      "Đã có minh chứng",
       "check-square",
       "teal",
     ],
-    ["Đang chờ duyệt", pending, "Đã gửi, chờ kết quả", "clock", "amber"],
-    ["Cần thực hiện", missing, "Chưa nộp hoặc cần nộp lại", "activity", "rose"],
+    ["Tệp đã gửi", tasks.reduce((sum, t) => sum + Number(t.file_count || 0), 0), "Trong nhiệm vụ đang mở", "folder", "amber"],
+    ["Cần thực hiện", missing, "Chưa có minh chứng", "activity", "rose"],
   ];
   loaded(
     $("#dashboardStats"),
@@ -416,11 +465,9 @@ function renderDashboard() {
     ? `${approved}/${tasks.length} nhiệm vụ đã hoàn thành`
     : "Chưa có nhiệm vụ đang mở";
   const next = tasks
-    .filter((t) => ["not_submitted", "rejected"].includes(t.status))
+    .filter((t) => submissionStatus(t) === "not_submitted")
     .sort(
       (a, b) =>
-        (a.status === "rejected" ? -1 : 0) -
-          (b.status === "rejected" ? -1 : 0) ||
         (+dateValue(a.due_at) || Infinity) - (+dateValue(b.due_at) || Infinity),
     )
     .slice(0, 3);
@@ -428,10 +475,10 @@ function renderDashboard() {
     ? next
         .map(
           (t, i) =>
-            `<div class="upcoming-item"><span>${String(i + 1).padStart(2, "0")}</span><div><b title="${h(t.title)}">${h(t.title)}</b><small>${t.status === "rejected" ? "Cần nộp lại · " : ""}${t.due_at ? formatDate(t.due_at, true) : "Chưa đặt hạn chót"}</small></div><button class="icon-button" data-task-action="${t.id}" data-task-view="${canSubmit(t) ? "submit" : "files"}" aria-label="Mở nhiệm vụ ${h(t.title)}">${icon("arrow-right")}</button></div>`,
+            `<div class="upcoming-item"><span>${String(i + 1).padStart(2, "0")}</span><div><b title="${h(t.title)}">${h(t.title)}</b><small>${t.due_at ? formatDate(t.due_at, true) : "Chưa đặt hạn chót"}</small></div><button class="icon-button" data-task-action="${t.id}" data-task-view="${canSubmit(t) ? "submit" : "files"}" aria-label="Mở nhiệm vụ ${h(t.title)}">${icon("arrow-right")}</button></div>`,
         )
         .join("")
-    : '<div class="empty-state compact"><b>Bạn đã cập nhật đủ bài nộp</b><p>Kết quả duyệt sẽ được cập nhật tại đây.</p></div>';
+    : '<div class="empty-state compact"><b>Bạn đã cập nhật đủ bài nộp</b><p>Các nhiệm vụ đang mở đều đã có minh chứng.</p></div>';
 }
 function renderTasks() {
   const search = normalize($("#taskSearch").value),
@@ -443,8 +490,8 @@ function renderTasks() {
       normalize(t.title + " " + t.description).includes(search) &&
       (status === "all" ||
         (status === "incomplete"
-          ? t.status !== "approved"
-          : t.status === status)) &&
+          ? submissionStatus(t) !== "approved"
+          : submissionStatus(t) === status)) &&
       (deadlineFilter === "all" ||
         (deadlineFilter === "archive" && !t.is_active) ||
         (deadlineFilter === "overdue" && isExpired(t)) ||
@@ -465,7 +512,7 @@ function renderTasks() {
       ? tasks
           .map(
             (t) =>
-              `<article class="task-card"><div class="task-card-top">${badge(t.status)}${!t.is_active ? '<span class="muted"><small>Đã đóng</small></span>' : deadline(t)}</div><h2>${h(t.title)}</h2>${t.description ? `<p>${h(t.description)}</p>` : ""}${t.review_note ? `<div class="review-note"><b>Phản hồi:</b> ${h(t.review_note)}</div>` : ""}<div class="task-card-footer"><small>${t.file_count ? `${t.file_count} tệp đã gửi` : "Chưa có minh chứng"}</small><div class="action-row">${t.file_count ? `<button class="button ghost small" data-task-action="${t.id}" data-task-view="files">Xem bài</button>` : ""}${canSubmit(t) ? `<button class="button soft small" data-task-action="${t.id}" data-task-view="submit">${t.file_count ? "Bổ sung" : "Gửi minh chứng"} ${icon("arrow-right")}</button>` : ""}</div></div></article>`,
+              `<article class="task-card"><div class="task-card-top">${badge(submissionStatus(t))}${!t.is_active ? '<span class="muted"><small>Đã đóng</small></span>' : deadline(t)}</div><h2>${h(t.title)}</h2>${t.description ? `<p>${h(t.description)}</p>` : ""}<div class="task-card-footer"><small>${t.file_count ? `${t.file_count} tệp đã gửi` : "Chưa có minh chứng"}</small><div class="action-row">${t.file_count ? `<button class="button ghost small" data-task-action="${t.id}" data-task-view="files">Xem bài</button>` : ""}${canSubmit(t) ? `<button class="button soft small" data-task-action="${t.id}" data-task-view="submit">${t.file_count ? "Bổ sung" : "Gửi minh chứng"} ${icon("arrow-right")}</button>` : ""}</div></div></article>`,
           )
           .join("")
       : empty("Không có nhiệm vụ phù hợp", "Thử thay đổi từ khóa hoặc bộ lọc."),
@@ -474,7 +521,7 @@ function renderTasks() {
 function renderUploadTask() {
   const task = selectedTask("#uploadTask");
   $("#uploadTaskInfo").innerHTML = task
-    ? `${badge(task.status)} ${deadline(task)}${task.description ? `<p>${h(task.description)}</p>` : ""}${task.review_note ? `<p class="danger-text"><b>Phản hồi:</b> ${h(task.review_note)}</p>` : ""}${!canSubmit(task) ? '<p class="danger-text">Nhiệm vụ đã đóng hoặc hết hạn nhận bài.</p>' : ""}`
+    ? `${badge(submissionStatus(task))} ${deadline(task)}${task.description ? `<p>${h(task.description)}</p>` : ""}${!canSubmit(task) ? '<p class="danger-text">Nhiệm vụ đã đóng hoặc hết hạn nhận bài.</p>' : ""}`
     : "";
   $("#submitButton").disabled = !canSubmit(task) || state.uploading;
   $("#dropZone").setAttribute(
@@ -613,12 +660,20 @@ async function upload(event) {
         clearSelected();
         metadataCache.clear();
         uploadProgress(100, "Đã lưu minh chứng");
+        // Chỉ ghi nhận sau HTTP thành công; cập nhật ngay trước khi tải lại dữ liệu.
+        task.file_count = Number(task.file_count || 0) + Math.max(1, Number(data.added || 0));
+        renderDashboard();
+        renderTasks();
+        renderUploadTask();
+        $("#navTaskCount").textContent = state.tasks.filter(
+          (t) => t.is_active && submissionStatus(t) !== "approved",
+        ).length;
         message(
           "#uploadMessage",
-          data.message +
+          "Đã gửi minh chứng. Nhiệm vụ đã hoàn thành." +
             (savings ? ` Đã giảm ${formatBytes(savings)} nhờ nén ảnh.` : ""),
         );
-        toast(data.message);
+        toast("Đã gửi minh chứng. Nhiệm vụ đã hoàn thành.");
         $("#filesTask").value = String(task.id);
         await loadTasks();
       },
@@ -685,12 +740,9 @@ async function loadMyFiles(force = false) {
         const submission = data.submission;
         $("#submissionStatus").innerHTML =
           submission && state.myFiles.length
-            ? `<div class="submission-banner">${badge(submission.status)}<span class="muted">Cập nhật ${formatDate(submission.updated_at)}</span></div>${submission.review_note ? `<div class="review-note">${h(submission.review_note)}</div><br>` : ""}`
+            ? `<div class="submission-banner">${badge(submissionStatus({ file_count: state.myFiles.length }))}<span class="muted">Cập nhật ${formatDate(submission.updated_at)}</span></div>`
             : "";
-        const history = data.history || [];
-        $("#reviewHistory").innerHTML = history.length
-          ? `<details class="review-history"><summary>Lịch sử duyệt (${history.length} lần gần nhất)</summary>${history.map((r) => `<div class="history-item">${badge(r.status)}<small>${formatDate(r.created_at)} · ${h(r.reviewer_name || "Quản lý")}</small>${r.note ? `<p>${h(r.note)}</p>` : ""}</div>`).join("")}</details>`
-          : "";
+        $("#reviewHistory").replaceChildren();
       },
     );
   } catch (error) {
@@ -711,7 +763,7 @@ async function removeFile(id) {
   if (!file) return;
   const result = await modal({
     title: "Xóa tài liệu này?",
-    description: `${file.image_name}\nBài sẽ cần được duyệt lại sau khi thay đổi minh chứng.`,
+    description: `${file.image_name}\nNếu xóa tệp cuối cùng, nhiệm vụ sẽ trở về Chưa nộp.`,
     submit: "Xóa tài liệu",
     danger: true,
     onSubmit: () => api(`/api/me/images?id=${id}`, { method: "DELETE" }),
@@ -738,7 +790,7 @@ async function loadManager() {
   ].forEach((key) => ($("#" + key).disabled = !id));
   if (!id) {
     $("#membersBody").innerHTML =
-      `<tr><td colspan="6">${empty("Chưa có nhiệm vụ", "Tạo nhiệm vụ đầu tiên để bắt đầu theo dõi.")}</td></tr>`;
+      `<tr><td colspan="5">${empty("Chưa có nhiệm vụ", "Tạo nhiệm vụ đầu tiên để bắt đầu theo dõi.")}</td></tr>`;
     $("#managerStats").replaceChildren();
     $("#unitOverview").replaceChildren();
     $("#managerTaskMeta").textContent = "";
@@ -746,7 +798,7 @@ async function loadManager() {
     return;
   }
   $("#membersBody").innerHTML =
-    '<tr><td colspan="6"><div class="skeleton line" aria-label="Đang tải thành viên"></div><div class="skeleton line"></div><div class="skeleton line"></div></td></tr>';
+    '<tr><td colspan="5"><div class="skeleton line" aria-label="Đang tải thành viên"></div><div class="skeleton line"></div><div class="skeleton line"></div></td></tr>';
   $("#membersBody").setAttribute("aria-busy", "true");
   skeleton($("#unitOverview"), 4, "line");
   try {
@@ -761,17 +813,18 @@ async function loadManager() {
         if (Number($("#managerTask").value) !== id) return;
         state.members = data.members || [];
         state.managerTask = data.task;
-        const stats = data.stats;
+        const stats = {
+          approved: state.members.filter((m) => submissionStatus(m) === "approved").length,
+          not_submitted: state.members.filter((m) => submissionStatus(m) === "not_submitted").length,
+        };
         $("#managerTaskMeta").innerHTML =
           `${data.task.is_active ? '<span class="badge approved">Đang mở</span>' : '<span class="badge not_submitted">Đã đóng</span>'} <span class="deadline">${data.task.due_at ? "Hạn chót: " + formatDate(data.task.due_at) : "Chưa đặt hạn chót"}</span>`;
         $("#toggleTaskButton").textContent = data.task.is_active
           ? "Đóng nhận bài"
           : "Mở nhận bài";
         $("#managerStats").innerHTML = [
-          ["Đạt", stats.approved, "green"],
-          ["Chờ duyệt", stats.pending, "orange"],
+          ["Hoàn thành", stats.approved, "green"],
           ["Chưa nộp", stats.not_submitted, ""],
-          ["Cần nộp lại", stats.rejected, "red"],
         ]
           .map(
             ([label, n, color]) =>
@@ -784,9 +837,9 @@ async function loadManager() {
             ? overview.units
                 .map((u) => {
                   const percent = u.expected
-                    ? Math.round((100 * u.approved) / u.expected)
+                    ? Math.round((100 * u.submitted) / u.expected)
                     : 0;
-                  return `<article class="unit-card"><b>${h(u.unit_label)}</b><div><span>${u.approved}/${u.expected} lượt hoàn thành</span><strong>${percent}%</strong></div><progress max="100" value="${percent}" aria-label="Tiến độ ${h(u.unit_label)}"></progress><small>Tất cả nhiệm vụ đang mở</small></article>`;
+                  return `<article class="unit-card"><b>${h(u.unit_label)}</b><div><span>${u.submitted}/${u.expected} lượt hoàn thành</span><strong>${percent}%</strong></div><progress max="100" value="${percent}" aria-label="Tiến độ ${h(u.unit_label)}"></progress><small>Tất cả nhiệm vụ đang mở</small></article>`;
                 })
                 .join("")
             : empty(
@@ -802,7 +855,7 @@ async function loadManager() {
       loaded($("#unitOverview"), empty("Chưa tải được tiến độ", error.message));
       $("#membersBody").removeAttribute("aria-busy");
       $("#membersBody").innerHTML =
-        `<tr><td colspan="6">${empty("Chưa tải được danh sách", error.message, '<button class="button soft" data-refresh="manager">Thử lại</button>')}</td></tr>`;
+        `<tr><td colspan="5">${empty("Chưa tải được danh sách", error.message, '<button class="button soft" data-refresh="manager">Thử lại</button>')}</td></tr>`;
     }
     throw error;
   }
@@ -815,74 +868,32 @@ function filteredMembers() {
     (m) =>
       normalize(m.name).includes(search) &&
       (unit === "all" || m.unit_code === unit) &&
-      (status === "all" || m.status === status),
+      (status === "all" || submissionStatus(m) === status),
   );
 }
 function renderMembers() {
-  const members = filteredMembers(),
-    visible = new Set(
-      members.filter((m) => m.status === "pending").map((m) => m.id),
-    );
-  state.selectedReviews = new Set(
-    [...state.selectedReviews].filter((id) => visible.has(id)),
-  );
+  const members = filteredMembers();
   loaded(
     $("#membersBody"),
     members.length
       ? members
           .map(
             (m) =>
-              `<tr><td class="checkbox-cell">${m.status === "pending" ? `<input type="checkbox" data-review-check="${m.id}" aria-label="Chọn bài của ${h(m.name)}" ${state.selectedReviews.has(m.id) ? "checked" : ""}>` : ""}</td><td><div class="member-cell"><span class="avatar">${initials(m.name)}</span><span><b>${h(m.name)}</b><small>${h(m.unit_label)}</small></span></div></td><td><span class="muted">${h(m.unit_label)}</span></td><td>${badge(m.status)}</td><td class="muted">${m.image_count ? formatDate(m.updated_at, true) : "—"}</td><td class="align-right">${m.image_count ? `<button class="button soft small" data-open-submission="${m.id}">${icon("folder")}${m.image_count} tệp</button>` : '<span class="muted">Chưa có tệp</span>'}</td></tr>`,
+              `<tr><td><div class="member-cell"><span class="avatar">${initials(m.name)}</span><span><b>${h(m.name)}</b><small>${h(m.unit_label)}</small></span></div></td><td><span class="muted">${h(m.unit_label)}</span></td><td>${badge(submissionStatus(m))}</td><td class="muted">${m.image_count ? formatDate(m.updated_at, true) : "—"}</td><td class="align-right">${m.image_count ? `<button class="button soft small" data-open-submission="${m.id}">${icon("folder")}${m.image_count} tệp</button>` : '<span class="muted">Chưa có tệp</span>'}</td></tr>`,
           )
           .join("")
-      : `<tr><td colspan="6">${empty("Không tìm thấy thành viên", "Thử đổi từ khóa hoặc bộ lọc.")}</td></tr>`,
+      : `<tr><td colspan="5">${empty("Không tìm thấy thành viên", "Thử đổi từ khóa hoặc bộ lọc.")}</td></tr>`,
   );
   $("#memberSummary").textContent =
-    `${members.length}/${state.members.length} thành viên · Chọn bài chờ duyệt để xử lý hàng loạt`;
+    `${members.length}/${state.members.length} thành viên`;
   renderBulk();
 }
 function renderBulk() {
-  const eligible = filteredMembers().filter((m) => m.status === "pending");
-  $("#bulkBar").hidden = !state.selectedReviews.size;
-  $("#selectedCount").textContent = `${state.selectedReviews.size} bài đã chọn`;
-  $("#selectAll").disabled = !eligible.length;
-  $("#selectAll").checked =
-    eligible.length > 0 &&
-    eligible.every((m) => state.selectedReviews.has(m.id));
-  $("#selectAll").indeterminate =
-    state.selectedReviews.size > 0 && !$("#selectAll").checked;
+  state.selectedReviews.clear();
 }
 async function review(status) {
-  const items = state.members
-    .filter((m) => state.selectedReviews.has(m.id) && m.status === "pending")
-    .map((m) => ({ id: m.id, revision: m.revision }));
-  if (!items.length) return;
-  if (items.length > 50) {
-    toast("Mỗi lần duyệt tối đa 50 bài.", "error");
-    return;
-  }
-  const reject = status === "rejected";
-  const result = await modal({
-    title: reject
-      ? `Yêu cầu ${items.length} bài nộp lại?`
-      : `Duyệt đạt ${items.length} bài?`,
-    description: reject
-      ? "Phản hồi được gửi kèm trạng thái để thành viên biết cần chỉnh sửa gì."
-      : "Xác nhận bạn đã kiểm tra các minh chứng được chọn.",
-    submit: reject ? "Yêu cầu nộp lại" : "Duyệt đạt",
-    danger: reject,
-    fields: `<label class="field"><span>${reject ? "Lý do cần nộp lại" : "Ghi chú (không bắt buộc)"}</span><textarea name="note" maxlength="1000" ${reject ? "required" : ""} placeholder="Nhập phản hồi của bạn…"></textarea></label>`,
-    onSubmit: (fields) =>
-      api("/api/cadre/review", {
-        method: "POST",
-        body: { items, status, note: fields.note },
-      }),
-  });
-  if (result) {
-    metadataCache.clear();
-    toast(result.message, result.skipped.length ? "info" : "success");
-    await Promise.all([loadManager(), loadTasks()]);
-  }
+  // Giữ tên hàm để tương thích, không thực hiện kiểm duyệt từ frontend.
+  return;
 }
 async function gallery(id) {
   const member = state.members.find((m) => m.id === id);
@@ -890,7 +901,7 @@ async function gallery(id) {
   const dialog = $("#galleryDialog");
   $("#galleryTitle").textContent = member.name;
   $("#galleryMeta").textContent =
-    `${member.unit_label} · ${member.image_count} tệp · ${STATUS[member.status]}`;
+    `${member.unit_label} · ${member.image_count} tệp · ${STATUS[submissionStatus(member)]}`;
   state.gallery = [];
   skeleton($("#galleryFiles"), 4, "tile");
   if (!dialog.open) dialog.showModal();
@@ -1028,6 +1039,7 @@ async function exportTask(format, button) {
 function bind() {
   setupUi();
   setupPreview();
+  setupJourney();
   updateThemeButtons();
   try {
     if (localStorage.getItem("b1-sidebar") === "collapsed")
@@ -1275,37 +1287,6 @@ function bind() {
     safeRun(() => state.managerTask && editTask(state.managerTask));
   $("#toggleTaskButton").onclick = () => safeRun(toggleTask);
   $("#deleteTaskButton").onclick = () => safeRun(deleteTask);
-  $("#selectAll").onchange = (e) => {
-    state.selectedReviews = e.target.checked
-      ? new Set(
-          filteredMembers()
-            .filter((m) => m.status === "pending")
-            .slice(0, 50)
-            .map((m) => m.id),
-        )
-      : new Set();
-    renderMembers();
-  };
-  $("#membersBody").onchange = (e) => {
-    if (e.target.dataset.reviewCheck) {
-      const id = Number(e.target.dataset.reviewCheck);
-      if (e.target.checked) {
-        if (state.selectedReviews.size >= 50) {
-          e.target.checked = false;
-          toast("Mỗi lần chọn tối đa 50 bài.", "info");
-          return;
-        }
-        state.selectedReviews.add(id);
-      } else state.selectedReviews.delete(id);
-      renderBulk();
-    }
-  };
-  $("#clearReviewSelection").onclick = () => {
-    state.selectedReviews.clear();
-    renderMembers();
-  };
-  $("#bulkApprove").onclick = () => safeRun(() => review("approved"));
-  $("#bulkReject").onclick = () => safeRun(() => review("rejected"));
   $("#exportExcel").onclick = () =>
     safeRun(() => exportTask("excel", $("#exportExcel")));
   $("#exportZip").onclick = () =>
