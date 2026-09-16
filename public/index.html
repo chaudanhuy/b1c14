@@ -12,6 +12,7 @@
     <link rel="icon" href="/assets/brand.svg" type="image/svg+xml" />
     <script src="/assets/js/theme.js"></script>
     <link rel="stylesheet" href="/assets/css/main.css?v=5" />
+    <link rel="stylesheet" href="/assets/css/extras.css?v=1" />
     <script type="module" src="/assets/js/app.js?v=5"></script>
   </head>
   <body data-entry="dashboard">
@@ -116,8 +117,9 @@
               Đăng nhập <span data-icon="arrow-right"></span>
             </button>
           </form>
-          <p class="login-note">
-            <span data-icon="shield"></span> Nếu quên mật khẩu, liên hệ<strong>Châu Đan Huy.</strong>
+          <p class="login-help">
+            <span data-icon="shield"></span> Nếu quên mật khẩu, liên hệ cán bộ
+            quản lý.
           </p>
           <button
             id="retryLogin"
@@ -128,7 +130,7 @@
             Thử tải lại danh sách
           </button>
         </div>
-        <span class="login-version">Designed by Chau Dan Huy</span>
+        <span class="login-version">Cổng nội bộ · Phiên bản 5.0</span>
       </main>
     </section>
     <div id="appShell" class="app-shell" hidden>
@@ -189,7 +191,7 @@
             <span data-icon="settings"></span
             ><span class="nav-text">Tài khoản</span>
           </button>
-          <button id="moreSidebarButton" class="nav-item" type="button" title="Thêm">
+          <button id="moreSidebarButton" data-view="more" class="nav-item" type="button" title="Thêm">
             <span data-icon="plus"></span><span class="nav-text">Thêm</span>
           </button>
         </nav>
@@ -666,6 +668,9 @@
               <p id="journeyMessage" class="muted"></p>
               <p class="journey-note muted">Mốc tính: 01/08/2028 · Giờ Việt Nam · Tự cập nhật theo đồng hồ thiết bị.</p>
             </article>
+          </section>
+          <section data-panel="more" class="view" hidden aria-label="Tiện ích">
+            <div id="extrasRoot" class="extras-shell"></div>
           </section>
           <section data-panel="account" class="view" hidden>
             <div class="page-heading">

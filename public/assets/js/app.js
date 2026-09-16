@@ -26,6 +26,8 @@ import {
   setupPreview,
 } from "./files.js";
 
+import { createExtras } from "./extras.js";
+
 // Quy ước hiển thị: có ít nhất một tệp là hoàn thành.
 // Không cập nhật trạng thái trong D1 và không gọi API kiểm duyệt.
 const STATUS = { not_submitted: "Chưa nộp", approved: "Hoàn thành" };
@@ -64,8 +66,6 @@ function updateJourney() {
       : "Từng ngày nỗ lực đều đưa bạn gần hơn với đích đến.";
 }
 function setupJourney() {
-  $("#moreSidebarButton").onclick = () =>
-    toast("Các tiện ích mới sẽ được bổ sung tại đây.", "info");
   window.setInterval(() => {
     if (state.member && state.view === "journey" && !document.hidden)
       updateJourney();
@@ -100,7 +100,9 @@ const VIEWS = {
   manager: "Quản lý minh chứng",
   account: "Tài khoản",
   journey: "Hành trình",
+  more: "Thêm",
 };
+const extras = createExtras({ api, getMember: () => state.member, isActive: () => state.view === "more" && !!state.member && !state.member.must_change_password });
 const safeRun = (fn) =>
   Promise.resolve()
     .then(fn)
@@ -194,6 +196,7 @@ function clearSelected() {
 }
 function expireSession() {
   state.epoch++;
+  extras.reset();
   abortRequests();
   metadataCache.clear();
   clearSelected();
@@ -291,6 +294,8 @@ function showView(view, { load = true } = {}) {
   if (state.member.must_change_password) view = "account";
   if (view !== "account") clearPasswordReset();
   state.view = view;
+  if (view === "more") extras.open();
+  else extras.close();
   if (view === "journey") updateJourney();
   $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== view));
   $$("[data-view]").forEach((button) => {
