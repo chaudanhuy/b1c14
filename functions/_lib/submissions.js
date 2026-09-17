@@ -8,11 +8,13 @@ export async function taskRoster(env, taskId) {
     FROM members m
     LEFT JOIN task_submissions s ON s.member_id = m.id AND s.task_id = ?
     LEFT JOIN members r ON r.id = s.reviewed_by
-    LEFT JOIN (SELECT submission_id, COUNT(*) AS file_count FROM submission_images GROUP BY submission_id) f ON f.submission_id = s.id
+    LEFT JOIN (SELECT submission_id, COUNT(*) AS file_count FROM submission_images
+      WHERE submission_id IN (SELECT id FROM task_submissions WHERE task_id = ?)
+      GROUP BY submission_id) f ON f.submission_id = s.id
     ORDER BY CASE m.unit_code WHEN 'cadre' THEN 0 ELSE CAST(m.unit_code AS INTEGER) END, m.display_order, m.name
   `,
   )
-    .bind(taskId)
+    .bind(taskId, taskId)
     .all();
   return result.results || [];
 }
@@ -33,12 +35,15 @@ export function summarize(rows) {
       approved: 0,
     });
     unit.total++;
-    stats[row.status]++;
-    if (row.status !== "not_submitted") {
+    const status = Number(row.image_count) > 0
+      ? (["approved", "pending", "rejected"].includes(row.status) ? row.status : "pending")
+      : "not_submitted";
+    stats[status]++;
+    if (status !== "not_submitted") {
       stats.submitted++;
       unit.submitted++;
     }
-    if (row.status === "approved") unit.approved++;
+    if (status === "approved") unit.approved++;
   }
   return stats;
 }

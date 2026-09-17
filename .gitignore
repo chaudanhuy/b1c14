@@ -6,3 +6,9 @@ node_modules/
 .env
 tests/artifacts/
 *.zip
+.build-chat/
+.build-routing/
+dist/
+.env.*
+.dev.vars.*
+!.dev.vars.example

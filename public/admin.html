@@ -11,10 +11,10 @@
     <title>Quản lý · ĐH31LQA</title>
     <link rel="icon" href="/assets/brand.svg" type="image/svg+xml" />
     <script src="/assets/js/theme.js"></script>
-    <link rel="stylesheet" href="/assets/css/main.css?v=5" />
+    <link rel="stylesheet" href="/assets/css/main.css?v=6" />
     <link rel="stylesheet" href="/assets/css/extras.css?v=1" />
     <link rel="stylesheet" href="/assets/css/community.css?v=1" />
-    <script type="module" src="/assets/js/app.js?v=5"></script>
+    <script type="module" src="/assets/js/app.js?v=6"></script>
   </head>
   <body data-entry="manager">
     <a class="skip-link" href="#mainContent">Đến nội dung chính</a>
@@ -242,7 +242,10 @@
               aria-label="Đổi giao diện sáng/tối"
             >
               <span data-icon="sun"></span></button
-            ><button
+            ><button id="notificationBell" class="icon-button notification-bell" type="button"
+              title="Bảng thông báo" aria-label="Bảng thông báo" aria-controls="extrasRoot">
+              <span data-icon="bell"></span><span id="notificationBadge" class="badge pending notification-count" hidden></span>
+            </button><button
               class="avatar avatar-button"
               data-view="account"
               data-member-initials
@@ -345,9 +348,10 @@
                   Theo dõi hạn chót và tiến độ nộp minh chứng.
                 </p>
               </div>
-              <button class="button soft" data-refresh="tasks">
-                <span data-icon="refresh"></span> Làm mới
-              </button>
+              <div class="action-row">
+                <button class="button soft" data-view="shared"><span data-icon="users"></span> Minh chứng đơn vị</button>
+                <button class="button soft" data-refresh="tasks"><span data-icon="refresh"></span> Làm mới</button>
+              </div>
             </div>
             <div class="toolbar panel">
               <label class="search-box"
@@ -550,6 +554,35 @@
               <div id="reviewHistory" hidden></div>
             </article>
           </section>
+          <section data-panel="shared" class="view" hidden>
+            <div class="page-heading">
+              <div><span class="eyebrow">TÀI LIỆU TRONG ĐƠN VỊ</span><h1>Minh chứng đơn vị</h1>
+                <p class="muted">Xem và tải tài liệu theo nhiệm vụ. Bài nộp của thành viên khác chỉ có quyền xem.</p></div>
+              <button class="button soft" data-view="tasks"><span data-icon="check-square"></span> Nhiệm vụ của tôi</button>
+            </div>
+            <article class="panel manager-panel">
+              <div class="toolbar flat"><label class="field grow"><span>Nhiệm vụ đang xem</span>
+                <select id="sharedTask"><option value="">Chọn nhiệm vụ…</option></select></label>
+                <button class="icon-button" data-refresh="shared" aria-label="Làm mới minh chứng đơn vị"><span data-icon="refresh"></span></button>
+              </div>
+              <h2 id="sharedTaskTitle"></h2><div id="sharedTaskMeta" class="muted"></div>
+              <p id="sharedTaskDescription" class="muted"></p>
+              <div class="toolbar flat"><label class="search-box"><span data-icon="search"></span>
+                <input id="sharedSearch" type="search" placeholder="Tìm thành viên…" aria-label="Tìm thành viên trong nhiệm vụ"></label>
+                <select id="sharedUnit" aria-label="Lọc tiểu đội"><option value="all">Tất cả tiểu đội</option><option value="cadre">Cán bộ trung đội</option><option value="1">Tiểu đội 1</option><option value="2">Tiểu đội 2</option><option value="3">Tiểu đội 3</option></select>
+                <select id="sharedStatus" aria-label="Lọc trạng thái nộp"><option value="all">Tất cả trạng thái</option><option value="approved">Đã nộp</option><option value="not_submitted">Chưa nộp</option></select>
+              </div>
+              <div class="table-wrap"><table class="member-table">
+                <thead><tr><th>THÀNH VIÊN</th><th>TIỂU ĐỘI</th><th>TRẠNG THÁI</th><th>CẬP NHẬT</th><th class="align-right">MINH CHỨNG</th></tr></thead>
+                <tbody id="sharedMembersBody"></tbody>
+              </table></div>
+              <div class="table-footer"><span id="sharedSummary" class="muted"></span><div class="action-row">
+                <button id="sharedMyFiles" class="button ghost small" disabled><span data-icon="folder"></span> Bài của tôi</button>
+                <button id="sharedSubmit" class="button soft small" disabled><span data-icon="upload"></span> Gửi minh chứng của tôi</button>
+                <button id="copySharedTask" class="button ghost small" disabled><span data-icon="link"></span> Sao chép liên kết</button>
+              </div></div>
+            </article>
+          </section>
           <section data-panel="manager" class="view" hidden>
             <div class="page-heading">
               <div>
@@ -596,6 +629,7 @@
               </div>
               <div id="managerTaskMeta" class="muted"></div>
               <div id="managerStats" class="mini-stat-grid"></div>
+              <div id="managerTaskChart"></div>
               <div class="toolbar flat">
                 <label class="search-box"
                   ><span data-icon="search"></span
@@ -637,6 +671,9 @@
                     <span data-icon="sheet"></span> Xuất Excel</button
                   ><button id="exportZip" class="button ghost small">
                     <span data-icon="download"></span> Tải ZIP nhiệm vụ
+                  </button>
+                  <button id="copyManagerTask" type="button" class="button ghost small" disabled>
+                    <span data-icon="link"></span> Sao chép liên kết
                   </button>
                 </div>
               </div>

@@ -14,8 +14,8 @@ export async function onRequestGet({ request, env }) {
     .bind(id)
     .first();
   if (!row) return new Response("Not Found", { status: 404 });
-  if (auth.member.role !== "cadre" && row.member_id !== auth.member.id)
-    return new Response("Forbidden", { status: 403 });
+  // Every authenticated member may read evidence. Writes still require ownership.
+  if (!env.UPLOADS) return new Response("Kho tệp chưa được cấu hình.", { status: 503 });
   const meta = await env.UPLOADS.head(row.image_key);
   if (!meta) return new Response("Not Found", { status: 404 });
   const ext =

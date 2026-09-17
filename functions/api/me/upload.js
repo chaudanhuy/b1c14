@@ -119,7 +119,7 @@ export async function onRequestPost({ request, env }) {
       return Response.json({
         ok: true,
         added: saved.size,
-        message: "Đã lưu minh chứng và chuyển sang chờ duyệt.",
+        message: "Đã lưu minh chứng. Nhiệm vụ đã hoàn thành.",
       });
     if (String(error).includes("FILE_LIMIT"))
       throw new HttpError(
@@ -136,6 +136,6 @@ export async function onRequestPost({ request, env }) {
   return Response.json({
     ok: true,
     added: records.length,
-    message: `Đã gửi ${records.length} tệp. Bài của bạn đang chờ duyệt.`,
+    message: `Đã gửi ${records.length} tệp. Nhiệm vụ đã hoàn thành.`,
   });
 }

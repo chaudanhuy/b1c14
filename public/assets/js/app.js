@@ -28,6 +28,11 @@ import {
 
 import { createExtras } from "./extras.js";
 import { createCommunity } from "./community.js";
+import { readRoute, savedRoute, rememberRoute, forgetRoute, copyTaskLink, renderTaskChart } from "./task-sharing.js";
+const initialRoute = readRoute(location.href);
+let pendingRoute = initialRoute?.taskId || initialRoute?.invalid
+  ? initialRoute : savedRoute() || initialRoute;
+rememberRoute(pendingRoute);
 
 // Quy ước hiển thị: có ít nhất một tệp là hoàn thành.
 // Không cập nhật trạng thái trong D1 và không gọi API kiểm duyệt.
@@ -90,6 +95,10 @@ const state = {
   gallery: [],
   selectedReviews: new Set(),
   managerTask: null,
+  sharedTask: null,
+  sharedTaskId: null,
+  sharedMembers: [],
+  selectionTaskId: null,
 };
 const requests = new Map(),
   metadataCache = new Map();
@@ -99,12 +108,13 @@ const VIEWS = {
   submit: "Gửi minh chứng",
   files: "Tài liệu của tôi",
   manager: "Quản lý minh chứng",
+  shared: "Minh chứng đơn vị",
   account: "Tài khoản",
   journey: "Hành trình",
   more: "Thêm",
 };
 const community = createCommunity({ api, getMember: () => state.member });
-const extras = createExtras({ community, api, getMember: () => state.member, isActive: () => state.view === "more" && !!state.member && !state.member.must_change_password });
+const extras = createExtras({ onSummary: updateNotificationBell, community, api, getMember: () => state.member, isActive: () => state.view === "more" && !!state.member && !state.member.must_change_password });
 const safeRun = (fn) =>
   Promise.resolve()
     .then(fn)
@@ -136,6 +146,7 @@ function abortRequests() {
   requests.clear();
 }
 async function api(url, { body, method = "GET", signal, ...options } = {}) {
+  const epoch = state.epoch;
   const headers = new Headers(options.headers || {});
   if (method !== "GET" && method !== "HEAD")
     headers.set("X-Requested-With", "B1C14");
@@ -159,6 +170,8 @@ async function api(url, { body, method = "GET", signal, ...options } = {}) {
     throw new Error("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
   }
   const data = await response.json().catch(() => ({}));
+  // A delayed request from an old account must not expire or overwrite the new session.
+  if (epoch !== state.epoch) throw new DOMException("Session changed", "AbortError");
   if (!response.ok) {
     if (data.code === "AUTH_REQUIRED") expireSession();
     if (data.code === "PASSWORD_CHANGE_REQUIRED" && state.member) {
@@ -189,6 +202,7 @@ async function latest(channel, work, apply) {
   }
 }
 function clearSelected() {
+  state.selectionTaskId = null;
   state.selected.forEach((r) => {
     if (r.url) URL.revokeObjectURL(r.url);
   });
@@ -196,7 +210,15 @@ function clearSelected() {
   $("#fileInput").value = "";
   renderSelected();
 }
-function expireSession() {
+function expireSession({ preserveRoute = true } = {}) {
+  if (preserveRoute) {
+    pendingRoute = readRoute(location.href) || pendingRoute;
+    rememberRoute(pendingRoute);
+  } else {
+    pendingRoute = null;
+    forgetRoute();
+    history.replaceState(null, "", location.pathname + "#dashboard");
+  }
   state.epoch++;
   extras.reset();
   community.reset();
@@ -211,6 +233,10 @@ function expireSession() {
   state.member = null;
   state.tasks = [];
   state.members = [];
+  state.managerTask = null;
+  state.sharedTask = null;
+  state.sharedTaskId = null;
+  state.sharedMembers = [];
   state.myFiles = [];
   state.gallery = [];
   state.selectedReviews.clear();
@@ -218,6 +244,9 @@ function expireSession() {
   $("#myFilesGrid").replaceChildren();
   $("#galleryFiles").replaceChildren();
   $("#membersBody").replaceChildren();
+  $("#sharedMembersBody").replaceChildren();
+  $("#managerTaskChart").replaceChildren();
+  updateNotificationBell(null);
   $("#appShell").hidden = true;
   $("#loginScreen").hidden = false;
   closeMenu(false);
@@ -287,7 +316,7 @@ function openMenu() {
   $("#menuButton").setAttribute("aria-expanded", "true");
   $("#closeMenu").focus();
 }
-function showView(view, { load = true } = {}) {
+function showView(view, { load = true, updateUrl = true, replace = false, extrasScreen = "hub" } = {}) {
   if (!state.member) return;
   if (
     !Object.hasOwn(VIEWS, view) ||
@@ -297,7 +326,7 @@ function showView(view, { load = true } = {}) {
   if (state.member.must_change_password) view = "account";
   if (view !== "account") clearPasswordReset();
   state.view = view;
-  if (view === "more") extras.open();
+  if (view === "more") extras.open(extrasScreen);
   else extras.close();
   if (view === "journey") updateJourney();
   $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== view));
@@ -310,7 +339,15 @@ function showView(view, { load = true } = {}) {
   $("#pageTitle").textContent = VIEWS[view];
   document.title = `${VIEWS[view]} · ĐH31LQA`;
   closeMenu(false);
-  history.replaceState(null, "", "#" + view);
+  if (updateUrl) {
+    const url = new URL(location.href);
+    url.searchParams.delete("redirect_to");
+    url.searchParams.delete("task_id");
+    if (view === "shared" && (state.sharedTaskId || $("#sharedTask").value))
+      url.searchParams.set("task_id", state.sharedTaskId || $("#sharedTask").value);
+    url.hash = view;
+    if (url.href !== location.href) history[replace ? "replaceState" : "pushState"](null, "", url);
+  }
   $("#mainContent").focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: "instant" });
   if (load) {
@@ -318,6 +355,7 @@ function showView(view, { load = true } = {}) {
       safeRun(loadResetMembers);
     if (view === "files") safeRun(() => loadMyFiles());
     else if (view === "manager") safeRun(loadManager);
+    else if (view === "shared") safeRun(() => loadShared());
     else if (view === "tasks" || view === "dashboard") safeRun(loadTasks);
   }
 }
@@ -393,7 +431,7 @@ async function loadTasks() {
     await latest(
       "tasks",
       (signal) =>
-        api(`/api/tasks${state.member.role === "cadre" ? "?all=1" : ""}`, {
+        api("/api/tasks?all=1", {
           signal,
         }),
       (data) => {
@@ -410,6 +448,7 @@ async function loadTasks() {
           "Chưa có nhiệm vụ",
         );
         fillTasks($("#managerTask"), state.tasks, "Chưa có nhiệm vụ");
+        fillTasks($("#sharedTask"), state.tasks, "Chưa có nhiệm vụ");
         if (
           previousUpload &&
           previousUpload !== $("#uploadTask").value &&
@@ -509,7 +548,7 @@ function renderTasks() {
     deadlineFilter = $("#taskDeadline").value;
   const tasks = state.tasks.filter(
     (t) =>
-      (t.is_active || t.file_count) &&
+      (t.is_active || t.file_count || deadlineFilter === "archive") &&
       normalize(t.title + " " + t.description).includes(search) &&
       (status === "all" ||
         (status === "incomplete"
@@ -535,7 +574,7 @@ function renderTasks() {
       ? tasks
           .map(
             (t) =>
-              `<article class="task-card"><div class="task-card-top">${badge(submissionStatus(t))}${!t.is_active ? '<span class="muted"><small>Đã đóng</small></span>' : deadline(t)}</div><h2>${h(t.title)}</h2>${t.description ? `<p>${h(t.description)}</p>` : ""}<div class="task-card-footer"><small>${t.file_count ? `${t.file_count} tệp đã gửi` : "Chưa có minh chứng"}</small><div class="action-row">${t.file_count ? `<button class="button ghost small" data-task-action="${t.id}" data-task-view="files">Xem bài</button>` : ""}${canSubmit(t) ? `<button class="button soft small" data-task-action="${t.id}" data-task-view="submit">${t.file_count ? "Bổ sung" : "Gửi minh chứng"} ${icon("arrow-right")}</button>` : ""}</div></div></article>`,
+              `<article class="task-card"><div class="task-card-top">${badge(submissionStatus(t))}${!t.is_active ? '<span class="muted"><small>Đã đóng</small></span>' : deadline(t)}</div><h2>${h(t.title)}</h2>${t.description ? `<p>${h(t.description)}</p>` : ""}<div class="task-card-footer"><small>${t.file_count ? `${t.file_count} tệp đã gửi` : "Chưa có minh chứng"}</small><div class="action-row"><button class="button ghost small" data-open-shared="${t.id}">Xem cả đơn vị</button>${t.file_count ? `<button class="button ghost small" data-task-action="${t.id}" data-task-view="files">Xem bài</button>` : ""}${canSubmit(t) ? `<button class="button soft small" data-task-action="${t.id}" data-task-view="submit">${t.file_count ? "Bổ sung" : "Gửi minh chứng"} ${icon("arrow-right")}</button>` : ""}</div></div></article>`,
           )
           .join("")
       : empty("Không có nhiệm vụ phù hợp", "Thử thay đổi từ khóa hoặc bộ lọc."),
@@ -543,6 +582,10 @@ function renderTasks() {
 }
 function renderUploadTask() {
   const task = selectedTask("#uploadTask");
+  if (state.selected.length && state.selectionTaskId !== Number(task?.id) && !state.uploading) {
+    clearSelected();
+    toast("Đã đổi nhiệm vụ. Hãy chọn lại tệp để tránh gửi nhầm.", "info");
+  }
   $("#uploadTaskInfo").innerHTML = task
     ? `${badge(submissionStatus(task))} ${deadline(task)}${task.description ? `<p>${h(task.description)}</p>` : ""}${!canSubmit(task) ? '<p class="danger-text">Nhiệm vụ đã đóng hoặc hết hạn nhận bài.</p>' : ""}`
     : "";
@@ -583,6 +626,7 @@ function addFiles(files, replaceId = null) {
     if (old?.url) URL.revokeObjectURL(old.url);
     state.selected = state.selected.filter((r) => r.id !== replaceId);
   }
+  state.selectionTaskId = Number($("#uploadTask").value);
   for (const file of files)
     state.selected.push({
       id: crypto.randomUUID(),
@@ -721,6 +765,7 @@ async function upload(event) {
   }
 }
 async function loadMyFiles(force = false) {
+  requests.get("files")?.abort();
   const id = Number($("#filesTask").value);
   state.myFiles = [];
   $("#submissionStatus").replaceChildren();
@@ -803,6 +848,9 @@ async function removeFile(id) {
   }
 }
 async function loadManager() {
+  requests.get("manager")?.abort();
+  $("#managerTaskChart").replaceChildren();
+  $("#copyManagerTask").disabled = true;
   if (state.member?.role !== "cadre" || state.member.must_change_password) return;
   const id = Number($("#managerTask").value);
   state.selectedReviews.clear();
@@ -841,6 +889,8 @@ async function loadManager() {
         if (Number($("#managerTask").value) !== id) return;
         state.members = data.members || [];
         state.managerTask = data.task;
+        $("#copyManagerTask").disabled = false;
+        renderTaskChart($("#managerTaskChart"), data.stats);
         const stats = {
           approved: state.members.filter((m) => submissionStatus(m) === "approved").length,
           not_submitted: state.members.filter((m) => submissionStatus(m) === "not_submitted").length,
@@ -907,7 +957,7 @@ function renderMembers() {
       ? members
           .map(
             (m) =>
-              `<tr><td><div class="member-cell"><span class="avatar">${initials(m.name)}</span><span><b>${h(m.name)}</b><small>${h(m.unit_label)}</small></span></div></td><td><span class="muted">${h(m.unit_label)}</span></td><td>${badge(submissionStatus(m))}</td><td class="muted">${m.image_count ? formatDate(m.updated_at, true) : "—"}</td><td class="align-right">${m.image_count ? `<button class="button soft small" data-open-submission="${m.id}">${icon("folder")}${m.image_count} tệp</button>` : '<span class="muted">Chưa có tệp</span>'}</td></tr>`,
+              `<tr><td><div class="member-cell"><span class="avatar">${h(initials(m.name))}</span><span><b>${h(m.name)}</b><small>${h(m.unit_label)}</small></span></div></td><td><span class="muted">${h(m.unit_label)}</span></td><td>${badge(submissionStatus(m))}</td><td class="muted">${m.image_count ? formatDate(m.updated_at, true) : "—"}</td><td class="align-right">${m.image_count ? `<button class="button soft small" data-open-submission="${m.id}">${icon("folder")}${m.image_count} tệp</button>` : '<span class="muted">Chưa có tệp</span>'}</td></tr>`,
           )
           .join("")
       : `<tr><td colspan="5">${empty("Không tìm thấy thành viên", "Thử đổi từ khóa hoặc bộ lọc.")}</td></tr>`,
@@ -923,8 +973,8 @@ async function review(status) {
   // Giữ tên hàm để tương thích, không thực hiện kiểm duyệt từ frontend.
   return;
 }
-async function gallery(id) {
-  const member = state.members.find((m) => m.id === id);
+async function gallery(id, shared = false) {
+  const member = (shared ? state.sharedMembers : state.members).find((m) => m.id === id);
   if (!member) return;
   const dialog = $("#galleryDialog");
   $("#galleryTitle").textContent = member.name;
@@ -941,7 +991,7 @@ async function gallery(id) {
       (signal) =>
         cached && Date.now() - cached.at < 15000
           ? Promise.resolve(cached.data)
-          : api(`/api/cadre/images?submission_id=${id}`, { signal }),
+          : api(`/api/${shared ? "tasks/files" : "cadre/images"}?submission_id=${id}`, { signal }),
       (data) => {
         if (!dialog.open) return;
         metadataCache.set(key, { data, at: Date.now() });
@@ -963,6 +1013,103 @@ async function gallery(id) {
     throw error;
   }
 }
+
+function updateNotificationBell(data) {
+  const count = Math.max(0, Number(data?.unread_notices) || 0);
+  $("#notificationBadge").hidden = !count;
+  $("#notificationBadge").textContent = count > 99 ? "99+" : String(count);
+  $("#notificationBell").setAttribute("aria-label",
+    count ? "Bảng thông báo: " + count + " thông báo chưa đọc" : "Bảng thông báo");
+  $("#notificationBell").title = count ? count + " thông báo chưa đọc" : "Bảng thông báo";
+}
+async function enterApplication(member) {
+  const route = pendingRoute || readRoute(location.href);
+  pendingRoute = route;
+  activate(member);
+  const epoch = state.epoch;
+  showView(member.must_change_password ? "account" : "dashboard", { load: false, updateUrl: false });
+  if (member.must_change_password) { rememberRoute(route); return; }
+  await loadTasks();
+  if (epoch !== state.epoch) return;
+  await applyRoute(route || { view: document.body.dataset.entry === "manager" && member.role === "cadre" ? "manager" : "dashboard" }, { replace: true });
+  pendingRoute = null;
+}
+async function applyRoute(route, options = {}) {
+  if (!state.member || state.member.must_change_password) return;
+  if (route?.invalid) {
+    forgetRoute();
+    toast("Liên kết nhiệm vụ không hợp lệ.", "error");
+    showView("tasks", { ...options, load: false });
+    return;
+  }
+  if (route?.taskId) {
+    rememberRoute(route);
+    await openSharedTask(route.taskId, options);
+    forgetRoute();
+  } else showView(route?.view || "dashboard", options);
+}
+async function openSharedTask(id, options = {}) {
+  state.sharedTaskId = id || null;
+  $("#sharedTask").value = String(id || "");
+  showView("shared", { ...options, load: false });
+  await loadShared(id);
+}
+async function loadShared(requestedId) {
+  if (!state.member || state.member.must_change_password) return;
+  requests.get("shared")?.abort();
+  const id = requestedId || Number($("#sharedTask").value) || state.sharedTaskId;
+  state.sharedTaskId = id || null;
+  state.sharedTask = null;
+  state.sharedMembers = [];
+  $("#sharedTaskTitle").textContent = "";
+  $("#sharedTaskMeta").replaceChildren();
+  $("#sharedTaskDescription").textContent = "";
+  $("#sharedSummary").textContent = "";
+  for (const key of ["copySharedTask", "sharedSubmit", "sharedMyFiles"]) $("#" + key).disabled = true;
+  const tbody = $("#sharedMembersBody");
+  if (!id) {
+    loaded(tbody, '<tr><td colspan="5">' + empty("Chưa có nhiệm vụ", "Danh sách xuất hiện khi có nhiệm vụ được tạo.") + '</td></tr>');
+    return;
+  }
+  loaded(tbody, '<tr><td colspan="5"><div class="skeleton line"></div><div class="skeleton line"></div></td></tr>');
+  tbody.setAttribute("aria-busy", "true");
+  try {
+    await latest("shared", signal => api("/api/tasks/shared?task_id=" + id, { signal }), data => {
+      if (state.sharedTaskId !== id) return;
+      state.sharedTask = data.task;
+      state.sharedMembers = data.members || [];
+      $("#sharedTaskTitle").textContent = data.task.title;
+      $("#sharedTaskMeta").innerHTML = deadline(data.task) + (!data.task.is_active ? ' <span class="badge not_submitted">Đã đóng</span>' : "");
+      $("#sharedTaskDescription").textContent = data.task.description || "";
+      $("#copySharedTask").disabled = false;
+      $("#sharedSubmit").disabled = !canSubmit(data.task);
+      $("#sharedMyFiles").disabled = !taskById(id)?.file_count && !data.task.is_active;
+      renderSharedMembers();
+    });
+  } catch (error) {
+    if (error.name !== "AbortError" && state.sharedTaskId === id)
+      loaded(tbody, '<tr><td colspan="5">' + empty("Chưa mở được nhiệm vụ", error.message,
+        '<button class="button soft" data-refresh="shared">Thử lại</button>') + '</td></tr>');
+    throw error;
+  }
+}
+function renderSharedMembers() {
+  const search = normalize($("#sharedSearch").value), unit = $("#sharedUnit").value, status = $("#sharedStatus").value;
+  const members = state.sharedMembers.filter(m => normalize(m.name).includes(search)
+    && (unit === "all" || m.unit_code === unit)
+    && (status === "all" || submissionStatus(m) === status));
+  loaded($("#sharedMembersBody"), members.length ? members.map(m =>
+    '<tr><td><div class="member-cell"><span class="avatar">' + h(initials(m.name)) +
+    '</span><span><b>' + h(m.name) + (m.member_id === state.member?.id ? " (Bạn)" : "") +
+    '</b><small>' + h(m.unit_label) + '</small></span></div></td><td class="muted">' +
+    h(m.unit_label) + '</td><td>' + badge(submissionStatus(m)) + '</td><td class="muted">' +
+    (m.image_count ? formatDate(m.updated_at, true) : "—") + '</td><td class="align-right">' +
+    (m.image_count ? '<button class="button soft small" data-open-shared-submission="' + Number(m.id) +
+    '">' + icon("folder") + Number(m.image_count) + ' tệp</button>' : '<span class="muted">Chưa có tệp</span>') +
+    '</td></tr>').join("") : '<tr><td colspan="5">' + empty("Không có thành viên phù hợp", "Thử đổi từ khóa hoặc bộ lọc.") + '</td></tr>');
+  $("#sharedSummary").textContent = members.length + "/" + state.sharedMembers.length + " thành viên · Chỉ xem và tải xuống";
+}
+
 function localDateInput(value) {
   const d = dateValue(value);
   if (!d) return "";
@@ -982,7 +1129,9 @@ async function editTask(existing = null) {
         body: {
           title: fields.title,
           description: fields.description,
-          due_at: fields.due_at ? new Date(fields.due_at).toISOString() : null,
+          due_at: existing && fields.due_at === localDateInput(existing.due_at)
+            ? existing.due_at
+            : fields.due_at ? new Date(fields.due_at).toISOString() : null,
           ...(existing ? { task_id: existing.id } : {}),
         },
       }),
@@ -1066,6 +1215,8 @@ async function exportTask(format, button) {
 }
 function updatePasswordRequirement() {
   community.sync();
+  $("#notificationBell").disabled = !!state.member?.must_change_password;
+  if (!state.member?.must_change_password) void extras.refreshSummary();
   const required = !!state.member?.must_change_password;
   $("#defaultPasswordBanner").hidden = !required && !state.member?.is_default_password;
   $("#defaultPasswordBanner p").textContent = required
@@ -1136,6 +1287,40 @@ function bind() {
   setupUi();
   setupPreview();
   setupJourney();
+  $("#notificationBell").onclick = () => showView("more", { extrasScreen: "notices" });
+  $("#copyManagerTask").onclick = () => safeRun(() => state.managerTask && copyTaskLink(state.managerTask.id));
+  $("#copySharedTask").onclick = () => safeRun(() => state.sharedTask && copyTaskLink(state.sharedTask.id));
+  $("#sharedTask").onchange = () => safeRun(() => openSharedTask(Number($("#sharedTask").value)));
+  for (const id of ["sharedSearch", "sharedUnit", "sharedStatus"])
+    $("#" + id).addEventListener(id === "sharedSearch" ? "input" : "change", renderSharedMembers);
+  $("#sharedSubmit").onclick = () => {
+    if (!state.sharedTask || !canSubmit(state.sharedTask)) return;
+    $("#uploadTask").value = String(state.sharedTask.id);
+    renderUploadTask();
+    showView("submit");
+  };
+  $("#sharedMyFiles").onclick = () => {
+    if (!state.sharedTask) return;
+    $("#filesTask").value = String(state.sharedTask.id);
+    showView("files");
+  };
+  let routeQueued = false;
+  const routeChanged = () => {
+    if (routeQueued) return;
+    routeQueued = true;
+    queueMicrotask(() => {
+      routeQueued = false;
+      const route = readRoute(location.href);
+      if (!state.member || state.member.must_change_password) {
+        pendingRoute = route; rememberRoute(route);
+        if (state.member) showView("account", { updateUrl: false });
+        return;
+      }
+      safeRun(() => applyRoute(route, { updateUrl: false }));
+    });
+  };
+  window.addEventListener("popstate", routeChanged);
+  window.addEventListener("hashchange", routeChanged);
   $("#passwordResetForm").onsubmit = (event) => {
     event.preventDefault();
     return safeRun(() => resetMemberPassword(event));
@@ -1213,6 +1398,8 @@ function bind() {
         );
         return;
       }
+      const shared = target.closest("[data-open-shared]");
+      if (shared) { await openSharedTask(Number(shared.dataset.openShared)); return; }
       const nav = target.closest("[data-view]");
       if (nav) {
         event.preventDefault();
@@ -1233,7 +1420,10 @@ function bind() {
         await busy(
           refresh,
           async () => {
-            if (refresh.dataset.refresh === "files") await loadMyFiles(true);
+            if (refresh.dataset.refresh === "shared") {
+              await loadTasks();
+              await loadShared();
+            } else if (refresh.dataset.refresh === "files") await loadMyFiles(true);
             else if (refresh.dataset.refresh === "manager") {
               await loadTasks();
               await loadManager();
@@ -1287,6 +1477,8 @@ function bind() {
         await removeFile(Number(removeUploaded.dataset.fileDelete));
         return;
       }
+      const cross = target.closest("[data-open-shared-submission]");
+      if (cross) { await gallery(Number(cross.dataset.openSharedSubmission), true); return; }
       const open = target.closest("[data-open-submission]");
       if (open) await gallery(Number(open.dataset.openSubmission));
     });
@@ -1316,9 +1508,7 @@ function bind() {
             },
           });
           $("#passwordInput").value = "";
-          activate(data.member);
-          showView("dashboard", { load: false });
-          await loadTasks();
+          await enterApplication(data.member);
         },
         "Đang đăng nhập…",
       );
@@ -1334,7 +1524,7 @@ function bind() {
         $("#logoutButton"),
         async () => {
           await api("/api/auth/logout", { method: "POST" });
-          expireSession();
+          expireSession({ preserveRoute: false });
         },
         "Đang đăng xuất…",
       );
@@ -1435,7 +1625,13 @@ function bind() {
           community.reset();
           community.sync();
           $("#passwordResetPanel").hidden = !state.member.can_reset_password;
-          safeRun(loadTasks);
+          if (pendingRoute?.taskId) {
+            await loadTasks();
+            await applyRoute(pendingRoute, { replace: true });
+            pendingRoute = null;
+          } else safeRun(loadTasks);
+          $("#notificationBell").disabled = false;
+          void extras.refreshSummary();
           if (state.member.can_reset_password) safeRun(loadResetMembers);
           $("#defaultPasswordBanner").hidden = true;
           message("#passwordMessage", data.message);
@@ -1466,17 +1662,7 @@ async function init() {
   try {
     const data = await api("/api/auth/me");
     if (data.member) {
-      activate(data.member);
-      showView("dashboard", { load: false });
-      await loadTasks();
-      const requested = location.hash.slice(1);
-      if (
-        document.body.dataset.entry === "manager" &&
-        data.member.role === "cadre"
-      )
-        showView("manager");
-      else if (requested && Object.hasOwn(VIEWS, requested))
-        showView(requested);
+      await enterApplication(data.member);
     } else await loadRoster();
   } catch (error) {
     if (state.member) {

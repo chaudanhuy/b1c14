@@ -11,7 +11,7 @@ const blank = text => `<div class="extras-empty">${h(text)}</div>`;
 const textInput = (name,label,value='',max=160) => `<label class="field"><span>${label}</span><input name="${name}" maxlength="${max}" required value="${h(value)}"></label>`;
 const area = (name,label,value='',max=8000,required=true) => `<label class="field"><span>${label}</span><textarea name="${name}" maxlength="${max}" ${required?'required':''}>${h(value)}</textarea></label>`;
 
-export function createExtras({ community, api, getMember, isActive }) {
+export function createExtras({ community, api, getMember, isActive, onSummary = () => {} }) {
   const root = document.getElementById('extrasRoot');
   let screen='hub', box='inbox', page=0, period='upcoming', version=0, session=0;
   let controller=new AbortController(), summarySequence=0, rows=[], currentMail=null, recipients=[];
@@ -45,15 +45,16 @@ export function createExtras({ community, api, getMember, isActive }) {
   }
   function draw(at, html) { if(at===version && active) root.innerHTML=html; }
   async function summary() {
-    if(!active || !allowed()) return;
+    if(!allowed()) return;
     const at=session, ticket=++summarySequence;
     try {
       const data=await api(endpoint+'summary');
-      if(at!==session || ticket!==summarySequence || !active) return;
+      if(at!==session || ticket!==summarySequence || !allowed()) return;
+      onSummary(data);
       for(const [key,value] of Object.entries(data))
         root.querySelectorAll('[data-extra-count="'+key+'"]').forEach(n=>n.textContent=value);
     } catch(error) {
-      if(at===session && active) root.querySelectorAll('[data-extra-count]').forEach(n=>n.textContent='—');
+      if(at===session && ticket===summarySequence) root.querySelectorAll('[data-extra-count]').forEach(n=>n.textContent='—');
     }
   }
   function hub() {
@@ -63,7 +64,7 @@ export function createExtras({ community, api, getMember, isActive }) {
       <button class="extras-tile" data-extra="mail"><span class="extras-symbol">${mailIcon}</span><strong>Hộp thư</strong><p>Gửi lời nhắn cho một người hoặc toàn bộ thành viên.</p><span class="extras-count"><span data-extra-count="unread_mail">…</span> thư chưa đọc →</span></button>
       <button class="extras-tile" data-extra="events"><span class="extras-symbol">${icon('clock')}</span><strong>Đếm ngược sự kiện</strong><p>Những mốc đáng nhớ, lịch thi và kế hoạch của riêng bạn.</p><span class="extras-count"><span data-extra-count="upcoming_events">…</span> sự kiện sắp tới →</span></button>
       <button class="extras-tile" data-extra="notices"><span class="extras-symbol">${bellIcon}</span><strong>Bảng thông báo</strong><p>Cập nhật thông tin chung và xác nhận khi bạn đã đọc.</p><span class="extras-count"><span data-extra-count="unread_notices">…</span> thông báo chưa đọc →</span></button>
-      ${communityTiles}</div><p class="extras-help">Thư được gửi trong website. Số lượng chưa đọc tự cập nhật mỗi phút khi bạn mở mục Thêm.</p>`;
+      ${communityTiles}</div><p class="extras-help">Thư được gửi trong website. Số lượng chưa đọc tự cập nhật mỗi phút khi bạn đang sử dụng website.</p>`;
     void summary();
   }
   async function mailList(reset=false) {
@@ -86,6 +87,7 @@ export function createExtras({ community, api, getMember, isActive }) {
       await request('mail',{method:'PATCH',body:{id,action:'read'}});
       if(at!==version) return;
     }
+    void summary();
     const m=currentMail;
     const destination=m.audience==='all'?'Toàn bộ thành viên':data.recipients.map(x=>x.name).join(', ');
     draw(at,header('Hộp thư','',true,button('mail-back','← Danh sách','ghost'))+
@@ -180,6 +182,7 @@ export function createExtras({ community, api, getMember, isActive }) {
       (rows.length?rows.map(n=>`<details class="extras-notice ${n.pinned?'pinned':''}"><summary><span class="extras-chip">${n.pinned?'Đã ghim · ':''}${n.is_read?'Đã đọc':'Chưa đọc'}</span><h2>${h(n.title)}</h2><p class="extras-meta">${h(n.author_name)} · ${stamp(n.updated_at)}</p></summary><div class="extras-body">${h(n.body)}</div><div class="extras-actions">
       ${button('read-notice',n.is_read?'Đã xác nhận đọc':icon('check')+' Đã đọc','soft small','data-id="'+n.id+'" '+(n.is_read?'disabled':''))}
       ${manager()?button('edit-notice',icon('edit')+' Sửa','ghost small','data-id="'+n.id+'"')+button('delete-notice',icon('trash')+' Xóa','ghost small danger-text','data-id="'+n.id+'"'):''}</div></details>`).join(''):blank('Chưa có thông báo.'))+'</div>'+pager(page,data.has_more));
+    void summary();
   }
   function noticeForm(notice=null) {
     if(!manager()) return;
@@ -255,11 +258,12 @@ export function createExtras({ community, api, getMember, isActive }) {
     });
   });
   window.setInterval(tick,1000);
-  window.setInterval(()=>{if(isActive()&&!document.hidden)void summary();},60000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();if(isActive())void summary();}});
+  window.setInterval(()=>{if(allowed()&&!document.hidden)void summary();},60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();if(allowed())void summary();}});
   return {
-    open(){if(!allowed())return;active=true;hub();},
+    open(destination='hub'){if(!allowed())return;active=true;if(destination==='notices')void run(()=>notices(true));else hub();},
+    refreshSummary: summary,
     close(){community.unmount();active=false;version++;controller.abort();},
-    reset(){community.unmount();session++;version++;active=false;controller.abort();rows=[];recipients=[];currentMail=null;draft=null;edit=null;writing=false;root.replaceChildren();},
+    reset(){onSummary(null);community.unmount();session++;version++;active=false;controller.abort();rows=[];recipients=[];currentMail=null;draft=null;edit=null;writing=false;root.replaceChildren();},
   };
 }

@@ -21,7 +21,7 @@ export async function onRequestPost({ request, env }) {
     items.length > 50 ||
     items.some(
       (x) =>
-        !Number.isSafeInteger(x.id) ||
+        !x || typeof x !== "object" || !Number.isSafeInteger(x.id) ||
         x.id < 1 ||
         !Number.isSafeInteger(x.revision) ||
         x.revision < 1,

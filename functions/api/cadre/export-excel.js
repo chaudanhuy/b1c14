@@ -13,7 +13,7 @@ const xml = (s) =>
 const labels = {
   not_submitted: "Chưa nộp",
   pending: "Chờ duyệt",
-  approved: "Đạt",
+  approved: "Đã nộp",
   rejected: "Cần nộp lại",
 };
 export async function onRequestGet({ request, env }) {
@@ -34,23 +34,25 @@ export async function onRequestGet({ request, env }) {
       "Nhiệm vụ",
       "Tiểu đội",
       "Họ và tên",
-      "Trạng thái",
+      "Tiến độ nộp",
       "Số tệp",
       "Nộp gần nhất (UTC)",
       "Người duyệt",
       "Phản hồi",
       "Hạn chót (UTC)",
+      "Trạng thái trong dữ liệu",
     ],
     ...members.map((m) => [
       task.title,
       m.unit_label,
       m.name,
-      labels[m.status],
+      m.image_count > 0 ? "Hoàn thành" : "Chưa nộp",
       m.image_count,
       m.updated_at || "",
       m.reviewer_name || "",
       m.review_note || "",
       task.due_at || "",
+      labels[m.status] || "",
     ]),
   ];
   // Inline strings prevent formulas supplied through names/titles/feedback from executing in Excel.
@@ -69,7 +71,7 @@ export async function onRequestGet({ request, env }) {
       '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Tiến độ minh chứng" sheetId="1" r:id="rId1"/></sheets></workbook>',
     "xl/_rels/workbook.xml.rels":
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
-    "xl/worksheets/sheet1.xml": `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="3" width="28" customWidth="1"/><col min="4" max="9" width="25" customWidth="1"/></cols><sheetData>${rows}</sheetData><autoFilter ref="A1:I${data.length}"/></worksheet>`,
+    "xl/worksheets/sheet1.xml": `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="3" width="28" customWidth="1"/><col min="4" max="10" width="25" customWidth="1"/></cols><sheetData>${rows}</sheetData><autoFilter ref="A1:J${data.length}"/></worksheet>`,
   };
   const files = Object.entries(parts).map(([path, content]) => ({
     path,
