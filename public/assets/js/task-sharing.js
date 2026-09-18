@@ -1,6 +1,6 @@
 import { escapeHTML as h, modal, toast } from "./ui.js";
 
-const views = new Set(["dashboard", "tasks", "submit", "files", "manager", "shared", "account", "journey", "more"]);
+const views = new Set(["dashboard", "tasks", "submit", "files", "manager", "shared", "account", "journey", "more", "smart-class", "lqa-message", "leaderboard", "links", "notices", "mail", "events"]);
 const entryPaths = new Set(["/", "/index", "/index.html", "/admin", "/admin.html"]);
 export const REDIRECT_KEY = "b1-redirect-to";
 export function taskId(value) {

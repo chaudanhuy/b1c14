@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "wrangler pages dev public",
     "build": "npm run sync:admin && wrangler pages functions build functions --outdir=.build",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "preview:qa": "node tests/preview.mjs",
     "format": "prettier --write public functions tests/*.mjs",
     "sync:admin": "node scripts/sync-admin.mjs",
     "test:chat": "node --test tests/chat-worker.test.mjs",
     "build:chat": "wrangler deploy --dry-run --config chat-worker/wrangler.jsonc --outdir=.build-chat",
-    "pack": "node scripts/package.mjs"
+    "pack": "node scripts/package.mjs",
+    "build:smart": "wrangler deploy --dry-run --config smart-class-worker/wrangler.jsonc --outdir=.build-smart",
+    "test:smart": "node --test --test-concurrency=1 tests/smart-*.test.mjs"
   },
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"

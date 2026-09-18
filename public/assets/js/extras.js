@@ -1,5 +1,5 @@
 import { escapeHTML as h, icon, toast, modal, busy } from './ui.js';
-import { communityTiles } from './community.js';
+import {avatarMarkup} from './avatar.js';
 
 const endpoint = '/api/extras/';
 const stamp = value => new Date(value).toLocaleString('vi-VN', { timeZone:'Asia/Ho_Chi_Minh', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
@@ -11,7 +11,7 @@ const blank = text => `<div class="extras-empty">${h(text)}</div>`;
 const textInput = (name,label,value='',max=160) => `<label class="field"><span>${label}</span><input name="${name}" maxlength="${max}" required value="${h(value)}"></label>`;
 const area = (name,label,value='',max=8000,required=true) => `<label class="field"><span>${label}</span><textarea name="${name}" maxlength="${max}" ${required?'required':''}>${h(value)}</textarea></label>`;
 
-export function createExtras({ community, api, getMember, isActive, onSummary = () => {} }) {
+export function createExtras({ community, api, getMember, isActive, getView = () => "more", navigate = () => {}, onSummary = () => {} }) {
   const root = document.getElementById('extrasRoot');
   let screen='hub', box='inbox', page=0, period='upcoming', version=0, session=0;
   let controller=new AbortController(), summarySequence=0, rows=[], currentMail=null, recipients=[];
@@ -58,14 +58,11 @@ export function createExtras({ community, api, getMember, isActive, onSummary = 
     }
   }
   function hub() {
-    begin('hub','Thêm','Một nơi cho những việc nhỏ, kết nối cả tập thể.');
-    root.innerHTML=header('Thêm','Một nơi cho những việc nhỏ, kết nối cả tập thể.',false,button('reload',icon('refresh')+' Làm mới','ghost'))+
-      `<div class="extras-tiles">
-      <button class="extras-tile" data-extra="mail"><span class="extras-symbol">${mailIcon}</span><strong>Hộp thư</strong><p>Gửi lời nhắn cho một người hoặc toàn bộ thành viên.</p><span class="extras-count"><span data-extra-count="unread_mail">…</span> thư chưa đọc →</span></button>
-      <button class="extras-tile" data-extra="events"><span class="extras-symbol">${icon('clock')}</span><strong>Đếm ngược sự kiện</strong><p>Những mốc đáng nhớ, lịch thi và kế hoạch của riêng bạn.</p><span class="extras-count"><span data-extra-count="upcoming_events">…</span> sự kiện sắp tới →</span></button>
-      <button class="extras-tile" data-extra="notices"><span class="extras-symbol">${bellIcon}</span><strong>Bảng thông báo</strong><p>Cập nhật thông tin chung và xác nhận khi bạn đã đọc.</p><span class="extras-count"><span data-extra-count="unread_notices">…</span> thông báo chưa đọc →</span></button>
-      ${communityTiles}</div><p class="extras-help">Thư được gửi trong website. Số lượng chưa đọc tự cập nhật mỗi phút khi bạn đang sử dụng website.</p>`;
-    void summary();
+    if(getView()!=="more"){navigate("more");return;}
+    begin('hub','Thêm','Tùy chọn hệ thống và liên kết ngoài.');
+    root.innerHTML=header('Thêm','Tùy chọn hệ thống và liên kết ngoài.',false)+
+      '<div class="extras-tiles"><button class="extras-tile" data-view="account"><span class="extras-symbol">'+icon('settings')+'</span><strong>Cài đặt cá nhân</strong><p>Ảnh đại diện, giao diện và mật khẩu.</p></button>'+
+      '<button class="extras-tile" data-view="links"><span class="extras-symbol">'+icon('link')+'</span><strong>Liên kết ngoài</strong><p>Các trang web do người quản trị chia sẻ.</p></button></div>';
   }
   async function mailList(reset=false) {
     if(reset) page=0;
@@ -261,9 +258,55 @@ export function createExtras({ community, api, getMember, isActive, onSummary = 
   window.setInterval(()=>{if(allowed()&&!document.hidden)void summary();},60000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();if(allowed())void summary();}});
   return {
-    open(destination='hub'){if(!allowed())return;active=true;if(destination==='notices')void run(()=>notices(true));else hub();},
+    open(destination='hub'){
+      if(!allowed())return;active=true;
+      if(destination==='lqa-message'){begin('lqa','LQA-Message','');community.mountChat(root,hub);}
+      else if(destination==='links'){begin('links','Liên kết nhanh','');community.mountLinks(root,hub);}
+      else if(destination==='notices')void run(()=>notices(true));
+      else if(destination==='mail'){box='inbox';void run(()=>mailList(true));}
+      else if(destination==='events')void run(()=>events(true));
+      else hub();
+    },
     refreshSummary: summary,
     close(){community.unmount();active=false;version++;controller.abort();},
-    reset(){onSummary(null);community.unmount();session++;version++;active=false;controller.abort();rows=[];recipients=[];currentMail=null;draft=null;edit=null;writing=false;root.replaceChildren();},
+    reset(){onSummary(null);community.unmount();session++;version++;active=false;controller.abort();rows=[];recipients=[];currentMail=null;draft=null;edit=null;writing=false;box="inbox";page=0;period="upcoming";root.replaceChildren();},
   };
+}
+
+export function createJourney({api,getMember}){
+  let generation=0,active=null;
+  const rootFor=view=>document.getElementById(view==="journey"?"journeyProgressRoot":"journeyLeaderboard");
+  function header(view){
+    return '<div class="page-heading"><div><span class="eyebrow">RÈN LUYỆN & GẮN KẾT</span><h'+(view==="journey"?'2':'1')+'>'+
+      (view==="journey"?'Dấu ấn của bạn':'Bảng xếp hạng')+'</h'+(view==="journey"?'2':'1')+'></div><button class="button soft" data-journey-refresh>Làm mới</button></div>';
+  }
+  async function load(view){
+    const at=++generation,owner=getMember()?.id,node=rootFor(view);active=view;
+    node.innerHTML=header(view)+'<div class="panel extras-loading" aria-busy="true"><div class="skeleton line"></div><div class="skeleton line"></div></div>';
+    try{
+      const data=await api('/api/extras/journey');
+      if(at!==generation||active!==view||getMember()?.id!==owner)return;
+      const m=data.me;if(!m)throw new Error('Chưa có dữ liệu hành trình.');
+      const rank=data.leaderboard.findIndex(p=>p.id===m.id)+1;
+      let html=header(view);
+      if(view==='journey'){
+        const target=m.next?.xp||m.level_start,progress=Math.max(0,Math.min(100,m.progress));
+        html+=`<article class="panel journey-exp"><div class="panel-heading"><div><span class="badge approved">${h(m.level)}</span><h2>${m.xp.toLocaleString('vi')} EXP</h2><p>${m.next?'Còn '+(target-m.xp)+' EXP để đạt '+h(m.next.name):'Bạn đã chạm mốc danh hiệu cao nhất.'}</p></div><span class="surface-icon indigo">#${rank}</span></div>
+          <div class="journey-exp-track" role="progressbar" tabindex="0" aria-label="Tiến độ lên cấp" aria-valuenow="${Math.round(progress)}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="${m.xp} / ${target} EXP" title="${m.xp} / ${target} EXP">
+          <div class="journey-exp-fill" style="width:${progress}%;--energy:${progress/100}"><i></i><i></i><i></i></div><span class="journey-exp-tooltip">${m.xp} / ${target} EXP</span></div>
+          <ol class="journey-nodes">${data.levels.map((l,i)=>`<li class="${m.xp>=l.xp?'reached':''}" ${l.name===m.level?'aria-current="step"':''}><span>${m.xp>=l.xp?'✓':i+1}</span><b>${h(l.name)}</b><small>${l.xp} EXP</small></li>`).join('')}</ol>
+          <div class="journey-metrics"><div><strong>${m.on_time}</strong><span>Bài nộp đúng hạn · +50 EXP/bài</span></div><div><strong>${m.attendance}</strong><span>Phiên có mặt · +20 EXP/phiên</span></div><div><strong>${m.interactions}</strong><span>Vòng tương tác · +5 EXP/vòng</span></div></div></article>`;
+      }else{
+        html+='<div class="panel journey-ranking">'+data.leaderboard.map((p,i)=>`<div class="journey-rank-row ${p.id===owner?'current':''}"><b>${i+1}</b><span class="avatar">${avatarMarkup(p)}</span><span><strong>${h(p.name)}</strong><small>${h(p.unit_label)} · ${h(p.level)}</small></span><span><b>${p.xp.toLocaleString('vi')} EXP</b><small>Smart Class: ${p.game_score.toLocaleString('vi')} điểm</small></span></div>`).join('')+'</div>';
+      }
+      node.innerHTML=html+'<p class="extras-help">'+h(data.note)+' Điểm Smart Class được đồng bộ sau khi khóa vòng; nếu chưa thấy thay đổi hãy bấm Làm mới sau vài giây.</p>';
+    }catch(error){
+      if(at!==generation||error.name==='AbortError')return;
+      node.innerHTML=header(view)+'<div class="notice"><p>'+h(error.message)+'</p></div>';
+    }
+  }
+  for(const view of ['journey','leaderboard'])rootFor(view).addEventListener('click',e=>{
+    if(e.target.closest('[data-journey-refresh]'))void load(view);
+  });
+  return {open(view){void load(view);},close(){generation++;active=null;},reset(){generation++;active=null;for(const v of ['journey','leaderboard'])rootFor(v).replaceChildren();}};
 }

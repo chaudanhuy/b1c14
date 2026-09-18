@@ -18,6 +18,7 @@ export function publicMember(member) {
     unit_code: member.unit_code,
     unit_label: member.unit_label,
     name: member.name,
+    avatar_url: member.avatar_url || null,
     role: hasManagementAccess(member) ? "cadre" : "member",
     is_default_password: !!member.is_default_password,
     must_change_password: !!member.must_change_password,
@@ -168,6 +169,7 @@ export async function getAuthenticatedMember(request, env) {
       must_change_password,
       can_manage,
       session_version,
+      avatar_url,
       updated_at
     FROM members
     WHERE id = ?

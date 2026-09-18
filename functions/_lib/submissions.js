@@ -1,7 +1,7 @@
 export async function taskRoster(env, taskId) {
   const result = await env.DB.prepare(
     `
-    SELECT m.id AS member_id, m.name, m.unit_code, m.unit_label, s.id, s.task_id,
+    SELECT m.id AS member_id, m.name, m.avatar_url, m.unit_code, m.unit_label, s.id, s.task_id,
       s.created_at, s.updated_at, s.revision, s.review_note, s.reviewed_at,
       r.name AS reviewer_name, COALESCE(f.file_count,0) AS image_count,
       CASE WHEN COALESCE(f.file_count,0) = 0 THEN 'not_submitted' ELSE s.status END AS status

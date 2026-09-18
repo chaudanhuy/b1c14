@@ -1,6 +1,9 @@
 import { getFileExtension, MAX_FILE_BYTES } from "./utils.js";
 import { HttpError } from "./security.js";
 export const MIME_BY_EXTENSION = {
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  zip: "application/zip",
   png: "image/png",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -41,7 +44,7 @@ function signature(b, values, offset = 0) {
 function textAt(b, start, end) {
   return new TextDecoder().decode(b.subarray(start, end));
 }
-function zipKind(b) {
+function zipKind(b, archive = false) {
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
   let e = -1;
   for (let i = b.length - 22; i >= Math.max(0, b.length - 65557); i--)
@@ -80,6 +83,8 @@ function zipKind(b) {
     names.add(name);
     p += 46 + n + extra + comment;
   }
+  if (p !== end) return "";
+  if (archive) return "zip";
   if (!names.has("[Content_Types].xml") || !names.has("_rels/.rels")) return "";
   const kinds = [
     ["word/document.xml", "docx"],
@@ -150,7 +155,7 @@ export async function validateFile(file) {
     throw new HttpError(415, `Không hỗ trợ định dạng của "${file.name}".`);
   const declared = String(file.type || "").toLowerCase();
   const generic = ["", "application/octet-stream"];
-  if (["docx", "xlsx", "pptx"].includes(ext))
+  if (["docx", "xlsx", "pptx", "zip"].includes(ext))
     generic.push("application/zip", "application/x-zip-compressed");
   if (declared !== canonical && !generic.includes(declared))
     throw new HttpError(415, `MIME và đuôi tệp "${file.name}" không khớp.`);
@@ -170,7 +175,10 @@ export async function validateFile(file) {
   )
     detected = "webp";
   else if (/%PDF-[12]\.\d/.test(textAt(b, 0, 1024))) detected = "pdf";
-  else if (signature(b, [80, 75, 3, 4])) detected = zipKind(b);
+  else if (ext === "mp3" && isMp3(b)) detected = "mp3";
+  else if (ext === "mp4" && isMp4(b)) detected = "mp4";
+  else if (signature(b, [80, 75, 3, 4])) detected = zipKind(b, ext === "zip");
+  else if (ext === "zip" && b.length === 22 && signature(b,[80,75,5,6]) && b.slice(4).every(x=>x===0)) detected = "zip";
   else detected = compoundKind(b);
   if (!detected || MIME_BY_EXTENSION[detected] !== canonical)
     throw new HttpError(
@@ -183,4 +191,35 @@ export async function validateFile(file) {
     ext: ext,
     size: file.size,
   };
+}
+
+function isMp3(b) {
+  let p=0;
+  if(textAt(b,0,3)==="ID3"){
+    if(b.length<10 || b[3]<2 || b[3]>4 || [b[6],b[7],b[8],b[9]].some(x=>x>127))return false;
+    p=10+((b[6]<<21)|(b[7]<<14)|(b[8]<<7)|b[9]);
+    if(b[3]===4 && (b[5]&16))p+=10;
+  }
+  if(p+4>=b.length || b[p]!==255 || (b[p+1]&224)!==224)return false;
+  const version=(b[p+1]>>3)&3, layer=(b[p+1]>>1)&3, rate=(b[p+2]>>4)&15, sample=(b[p+2]>>2)&3;
+  return version!==1 && layer===1 && rate>0 && rate<15 && sample<3;
+}
+function isMp4(b) {
+  if(b.length<24)return false;
+  const v=new DataView(b.buffer,b.byteOffset,b.byteLength),types=new Set();
+  let p=0,count=0;
+  while(p+8<=b.length && count++<10000){
+    let size=v.getUint32(p),header=8;
+    const type=textAt(b,p+4,p+8);
+    if(size===1){if(p+16>b.length || v.getUint32(p+8)!==0)return false;size=v.getUint32(p+12);header=16;}
+    if(size===0)size=b.length-p;
+    if(size<header || p+size>b.length)return false;
+    if(type==="ftyp"){
+      if(size<header+8)return false;
+      const brand=textAt(b,p+header,p+header+4);
+      if(!/^(isom|iso[2-9]|mp4[12]|avc1|M4V |MSNV|dash)$/.test(brand))return false;
+    }
+    types.add(type);p+=size;
+  }
+  return p===b.length && types.has("ftyp") && types.has("moov") && types.has("mdat");
 }

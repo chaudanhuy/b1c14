@@ -14,9 +14,9 @@ export async function onRequestGet({ request, env }) {
   ).bind(id).first();
   if (!task) throw new HttpError(404, "Nhiệm vụ không còn tồn tại.");
   const roster = await taskRoster(env, id);
-  const members = roster.map(({ member_id, name, unit_code, unit_label, id,
+  const members = roster.map(({ member_id, name, avatar_url, unit_code, unit_label, id,
     image_count, status, updated_at, revision }) => ({
-    member_id, name, unit_code, unit_label, id, image_count,
+    member_id, name, avatar_url, unit_code, unit_label, id, image_count,
     status, updated_at, revision, can_edit: false,
   }));
   return Response.json({ task, members, stats: summarize(roster) },

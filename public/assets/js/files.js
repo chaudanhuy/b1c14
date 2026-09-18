@@ -11,6 +11,9 @@ export const MAX_FILE_SIZE = 20 * 1024 * 1024,
   MAX_TOTAL_SIZE = 25 * 1024 * 1024,
   MAX_FILES = 10;
 export const EXTENSIONS = [
+  "mp3",
+  "mp4",
+  "zip",
   "png",
   "jpg",
   "jpeg",
@@ -23,10 +26,15 @@ export const EXTENSIONS = [
   "ppt",
   "pptx",
 ];
+export const FILE_ACCEPT = EXTENSIONS.map(e => "." + e).join(",");
 export const extension = (name) =>
   (/\.([a-z0-9]+)$/i.exec(name || "")?.[1] || "").toLowerCase();
 export function fileKind(f) {
   const types = {
+    "audio/mpeg": "mp3",
+    "video/mp4": "mp4",
+    "application/zip": "zip",
+    "application/x-zip-compressed": "zip",
     "image/png": "png",
     "image/jpeg": "jpg",
     "image/webp": "webp",
@@ -46,6 +54,9 @@ export function fileKind(f) {
   if (["doc", "docx"].includes(e)) return { key: "word", label: "W" };
   if (["xls", "xlsx"].includes(e)) return { key: "excel", label: "X" };
   if (["ppt", "pptx"].includes(e)) return { key: "ppt", label: "P" };
+  if (e === "mp3") return { key: "audio", label: "♫" };
+  if (e === "mp4") return { key: "video", label: "▶" };
+  if (e === "zip") return { key: "archive", label: "ZIP" };
   if (e === "pdf") return { key: "pdf", label: "PDF" };
   return { key: "file", label: (e || "FILE").toUpperCase() };
 }
@@ -184,6 +195,14 @@ export function openPreview(file) {
       }
     };
     img.src = fileUrl(file);
+  } else if (kind.key === "audio" || kind.key === "video") {
+    const media = document.createElement(kind.key === "audio" ? "audio" : "video");
+    media.controls = true; media.preload = "metadata"; media.setAttribute("playsinline", "");
+    media.className = "media-preview"; media.src = fileUrl(file);
+    media.setAttribute("aria-label", file.image_name || file.name || "Phát tệp");
+    const fallback = document.createElement("p"); fallback.className = "muted";
+    fallback.textContent = "Nếu thiết bị không hỗ trợ codec của tệp, hãy tải xuống để mở.";
+    stage.append(media, fallback);
   } else if (kind.key === "pdf") {
     stage.innerHTML = `<iframe title="Xem trước PDF" src="${escapeHTML(fileUrl(file))}"></iframe>`;
   } else {
@@ -191,6 +210,7 @@ export function openPreview(file) {
   }
 }
 export function setupPreview() {
+  document.querySelectorAll("#fileInput,#replaceInput").forEach(n=>n.accept=FILE_ACCEPT);
   $("#zoomIn").onclick = () => {
     zoom = Math.min(4, zoom + 0.25);
     transformImage();
@@ -210,6 +230,7 @@ export function setupPreview() {
   };
   $("#previewDialog").addEventListener("close", () => {
     ++previewVersion;
+    document.querySelectorAll("#previewStage audio,#previewStage video").forEach(n=>{n.pause();n.removeAttribute("src");n.load();});
     previewImage = null;
     $("#previewStage").replaceChildren();
     $("#previewStage").removeAttribute("aria-busy");

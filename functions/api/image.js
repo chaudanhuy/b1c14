@@ -26,7 +26,7 @@ export async function onRequestGet({ request, env }) {
     getFileExtension(name) || ext === "bin" ? name : `${name}.${ext}`;
   const inline =
     url.searchParams.get("download") !== "1" &&
-    ["image/png", "image/jpeg", "image/webp", "application/pdf"].includes(type);
+    ["image/png", "image/jpeg", "image/webp", "application/pdf", "audio/mpeg", "video/mp4"].includes(type);
   const headers = new Headers({
     "Content-Type": type,
     "Content-Disposition": disposition(filename, inline),

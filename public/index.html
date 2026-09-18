@@ -12,7 +12,7 @@
     <link rel="icon" href="/assets/brand.svg" type="image/svg+xml" />
     <script src="/assets/js/theme.js"></script>
     <link rel="stylesheet" href="/assets/css/main.css?v=6" />
-    <link rel="stylesheet" href="/assets/css/extras.css?v=1" />
+    <link rel="stylesheet" href="/assets/css/extras.css?v=6" />
     <link rel="stylesheet" href="/assets/css/community.css?v=1" />
     <script type="module" src="/assets/js/app.js?v=6"></script>
   </head>
@@ -160,48 +160,26 @@
             <span data-icon="x"></span>
           </button>
         </div>
-        <nav class="nav-list">
-          <span class="nav-label">KHÔNG GIAN LÀM VIỆC</span>
-          <button class="nav-item" data-view="dashboard" title="Tổng quan">
-            <span data-icon="grid"></span
-            ><span class="nav-text">Tổng quan</span>
-          </button>
-          <button class="nav-item" data-view="tasks" title="Nhiệm vụ của tôi">
-            <span data-icon="check-square"></span
-            ><span class="nav-text">Nhiệm vụ của tôi</span
-            ><span id="navTaskCount" class="nav-count">0</span>
-          </button>
-          <button class="nav-item" data-view="submit" title="Gửi minh chứng">
-            <span data-icon="upload"></span
-            ><span class="nav-text">Gửi minh chứng</span>
-          </button>
-          <button class="nav-item" data-view="files" title="Tài liệu của tôi">
-            <span data-icon="folder"></span
-            ><span class="nav-text">Tài liệu của tôi</span>
-          </button>
-          <button class="nav-item" data-view="journey" title="Hành trình">
-            <span data-icon="activity"></span><span class="nav-text">Hành trình</span>
-          </button>
-          <span class="nav-label" data-manager-only hidden>QUẢN LÝ ĐƠN VỊ</span>
-          <button
-            class="nav-item"
-            data-view="manager"
-            data-manager-only
-            hidden
-            title="Quản lý minh chứng"
-          >
-            <span data-icon="users"></span
-            ><span class="nav-text">Quản lý minh chứng</span>
-          </button>
-          <span class="nav-label">CÁ NHÂN</span
-          ><button class="nav-item" data-view="account" title="Tài khoản">
-            <span data-icon="settings"></span
-            ><span class="nav-text">Tài khoản</span>
-          </button>
-          <button id="moreSidebarButton" data-view="more" class="nav-item" type="button" title="Thêm">
-            <span data-icon="plus"></span><span class="nav-text">Thêm</span>
-          </button>
-        </nav>
+        <nav class="nav-list" aria-label="Điều hướng chính">
+<span class="nav-label">HỌC TẬP & NHIỆM VỤ</span>
+<button type="button" class="nav-item" data-view="dashboard" title="Tổng quan"><span data-icon="grid"></span><span class="nav-text">Tổng quan</span></button>
+<button type="button" class="nav-item" data-view="tasks" title="Nhiệm vụ của tôi"><span data-icon="check-square"></span><span class="nav-text">Nhiệm vụ của tôi</span><span id="navTaskCount" class="nav-count">0</span></button>
+<button type="button" class="nav-item" data-view="submit" title="Gửi minh chứng"><span data-icon="upload"></span><span class="nav-text">Gửi minh chứng</span></button>
+<button type="button" class="nav-item" data-view="leaderboard" title="Bảng xếp hạng"><span data-icon="activity"></span><span class="nav-text">Bảng xếp hạng</span></button>
+<button type="button" class="nav-item" data-view="manager" title="Quản lý minh chứng" data-manager-only hidden><span data-icon="users"></span><span class="nav-text">Quản lý minh chứng</span></button>
+<span class="nav-label">TƯƠNG TÁC LỚP HỌC</span>
+<button type="button" class="nav-item" data-view="smart-class" title="Smart Class"><span data-icon="grid"></span><span class="nav-text">Smart Class</span></button>
+<button type="button" class="nav-item" data-view="lqa-message" title="LQA-Message"><span data-icon="users"></span><span class="nav-text">LQA-Message</span></button>
+<button type="button" class="nav-item" data-view="journey" title="Hành trình"><span data-icon="activity"></span><span class="nav-text">Hành trình</span></button>
+<button type="button" class="nav-item" data-view="mail" title="Hộp thư"><span data-icon="file"></span><span class="nav-text">Hộp thư</span></button>
+<button type="button" class="nav-item" data-view="events" title="Đếm ngược sự kiện"><span data-icon="clock"></span><span class="nav-text">Đếm ngược sự kiện</span></button>
+<span class="nav-label">TÀI NGUYÊN & TIỆN ÍCH</span>
+<button type="button" class="nav-item" data-view="files" title="Tài liệu của tôi"><span data-icon="folder"></span><span class="nav-text">Tài liệu của tôi</span></button>
+<button type="button" class="nav-item" data-view="links" title="Liên kết nhanh"><span data-icon="link"></span><span class="nav-text">Liên kết nhanh</span></button>
+<button type="button" class="nav-item" data-view="notices" title="Bảng thông báo"><span data-icon="bell"></span><span class="nav-text">Bảng thông báo</span></button>
+<button type="button" class="nav-item" data-view="account" title="Tài khoản"><span data-icon="settings"></span><span class="nav-text">Tài khoản</span></button>
+<button type="button" class="nav-item" data-view="more" title="Thêm" id="moreSidebarButton"><span data-icon="plus"></span><span class="nav-text">Thêm</span></button>
+</nav>
         <div class="sidebar-foot">
           <div class="sidebar-person">
             <span class="avatar" data-member-initials></span
@@ -422,14 +400,14 @@
                       <span class="button soft"
                         >Chọn tài liệu <span data-icon="plus"></span></span
                       ><small
-                        >JPG, PNG, WebP, PDF, Word, Excel, PowerPoint</small
+                        >JPG, PNG, WebP, PDF, Word, Excel, PowerPoint, MP3, MP4, ZIP</small
                       >
                     </div>
                     <input
                       id="fileInput"
                       type="file"
                       multiple
-                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp3,.mp4,.zip"
                       hidden
                     /><input
                       id="cameraInput"
@@ -440,7 +418,7 @@
                     /><input
                       id="replaceInput"
                       type="file"
-                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp3,.mp4,.zip"
                       hidden
                     />
                     <div class="upload-options">
@@ -712,8 +690,11 @@
               <p id="journeyMessage" class="muted"></p>
               <p class="journey-note muted">Mốc tính: 01/08/2028 · Giờ Việt Nam · Tự cập nhật theo đồng hồ thiết bị.</p>
             </article>
-          </section>
-          <section data-panel="more" class="view" hidden aria-label="Tiện ích">
+          <div id="journeyProgressRoot"></div>
+</section>
+          <section data-panel="smart-class" class="view" hidden><div id="smartClassRoot"></div></section>
+<section data-panel="leaderboard" class="view" hidden><div id="journeyLeaderboard"></div></section>
+<section data-panel="more" class="view" hidden aria-label="Tiện ích">
             <div id="extrasRoot" class="extras-shell"></div>
           </section>
           <section data-panel="account" class="view" hidden>
@@ -730,6 +711,12 @@
                 <h2 data-member-name></h2>
                 <p data-member-unit class="muted"></p>
                 <span id="accountRole" class="badge approved"></span>
+                <div class="action-row avatar-actions">
+                  <button id="avatarChoose" class="button soft small" type="button">Chọn ảnh đại diện</button>
+                  <button id="avatarRemove" class="button ghost small" type="button">Dùng ảnh mặc định</button>
+                </div>
+                <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+                <p class="muted"><small>PNG, JPEG, WebP · Cắt ảnh trước khi lưu.</small></p>
                 <hr />
                 <label class="field"
                   ><span>Giao diện</span

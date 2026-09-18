@@ -8,6 +8,9 @@ export const communityTiles=`<button class="extras-tile" data-extra="lqa"><span 
 
 export function createCommunity({api,getMember}) {
   let socket=null,epoch=0,connecting=false,retry=null,heartbeat=null,lastPong=0,attempt=0,serverOffset=0;
+  let activeTab='', windowFocused=document.hasFocus();
+  window.addEventListener('focus',()=>{windowFocused=true;});
+  window.addEventListener('blur',()=>{windowFocused=false;});
   let status='Chưa kết nối',ready=false,people=[],host=null,mode='',back=null,viewEpoch=0;
   let peer=null,messages=[],historyId=null,hasMore=false,expiry=null,loadingHistory=false;
   const drafts=new Map(),pending=new Map(),seen=new Map(),expiries=new Map();
@@ -78,7 +81,7 @@ export function createCommunity({api,getMember}) {
       expiry=deadline;
       if(!messages.some(m=>m.id===message.id)){messages.push(message);messages.sort((a,b)=>a.seq-b.seq);renderMessages();}
     }
-    if(!duplicate&&notification&&message.recipient===me)notify(message,name||people.find(p=>p.id===other)?.name||'Thành viên',deadline);
+    if(!duplicate&&notification&&message.recipient===me&&!(activeTab==='lqa-message'&&!document.hidden&&windowFocused))notify(message,name||people.find(p=>p.id===other)?.name||'Thành viên',deadline);
   }
   function expirePeer(id){
     expiries.delete(id);drafts.delete(id);
@@ -102,7 +105,7 @@ export function createCommunity({api,getMember}) {
       messages=[...merged.values()].sort((a,b)=>a.seq-b.seq);
       for(const m of messages)seen.set(m.id,{peer:peer.id,expires:expiry});
       renderMessages(!older);composer();
-    }else if(data.type==='message'){addMessage(data.message,data.expires_at,data.sender_name);}
+    }else if(data.type==='message'||data.type==='NEW_MESSAGE'){addMessage(data.message,data.expires_at,data.sender_name);}
     else if(data.type==='ack'){
       addMessage(data.message,data.expires_at,null,false);
       const p=pending.get(data.id);if(p){clearTimeout(p.timer);pending.delete(data.id);}
@@ -227,7 +230,7 @@ export function createCommunity({api,getMember}) {
   }
   function mount(root,next,onBack){
     if(host)host.removeEventListener('click',action);
-    viewEpoch++;host=root;mode=next;back=onBack;host.addEventListener('click',action);
+    viewEpoch++;host=root;mode=next;activeTab=next==='chat'?'lqa-message':next;back=onBack;host.addEventListener('click',action);
     if(next==='chat'){renderOnline();void connect();}else void renderLinks();
   }
   function clearChats(){
@@ -239,6 +242,6 @@ export function createCommunity({api,getMember}) {
   function reset(){
     epoch++;dropConnection();status='Chưa kết nối';unmount();clearChats();
   }
-  function unmount(){viewEpoch++;if(host)host.removeEventListener('click',action);host=null;mode='';back=null;}
+  function unmount(){viewEpoch++;if(host)host.removeEventListener('click',action);host=null;mode='';activeTab='';back=null;}
   return {sync(){if(allowed())void connect();else reset();},reset,unmount,mountChat:(r,b)=>mount(r,'chat',b),mountLinks:(r,b)=>mount(r,'links',b)};
 }

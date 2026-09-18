@@ -2858,3 +2858,15 @@ progress::-webkit-progress-value {
   .manager-panel .member-table td:nth-child(4) { display: none; }
   .task-chart { gap: 16px; }
 }
+
+/* Avatar and native media additions; preserve all existing theme tokens. */
+.avatar { overflow: hidden; }
+.avatar-image { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.avatar-actions { justify-content: center; flex-wrap: wrap; margin: 16px 0 10px; }
+.avatar-crop canvas { display: block; width: min(100%,320px); height: auto; margin: 0 auto; border-radius: 20px; background: var(--surface-2); }
+.avatar-crop input[type=range] { accent-color: var(--primary); min-height: 36px; }
+.media-preview { width: 100%; max-width: 800px; max-height: 60dvh; }
+audio.media-preview { max-width: 560px; }
+.file-icon.audio { background: var(--tint); color: var(--primary); }
+.file-icon.video { background: var(--blue-bg); color: var(--blue); }
+.file-icon.archive { background: var(--amber-bg); color: var(--amber); }

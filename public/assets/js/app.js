@@ -26,9 +26,11 @@ import {
   setupPreview,
 } from "./files.js";
 
-import { createExtras } from "./extras.js";
+import { createJourney, createExtras } from "./extras.js";
 import { createCommunity } from "./community.js";
 import { readRoute, savedRoute, rememberRoute, forgetRoute, copyTaskLink, renderTaskChart } from "./task-sharing.js";
+import { avatarMarkup, renderOwnAvatar, setupAvatar } from "./avatar.js";
+import { createSmartClass } from "./smart-class.js";
 const initialRoute = readRoute(location.href);
 let pendingRoute = initialRoute?.taskId || initialRoute?.invalid
   ? initialRoute : savedRoute() || initialRoute;
@@ -112,9 +114,14 @@ const VIEWS = {
   account: "Tài khoản",
   journey: "Hành trình",
   more: "Thêm",
+  "smart-class": "Smart Class", "lqa-message": "LQA-Message", leaderboard: "Bảng xếp hạng",
+  links: "Liên kết nhanh", notices: "Bảng thông báo", mail: "Hộp thư", events: "Đếm ngược sự kiện",
 };
+const extraViews = new Set(["more","lqa-message","links","notices","mail","events"]);
+const smartClass = createSmartClass({api, getMember: () => state.member});
+const journey = createJourney({api, getMember: () => state.member});
 const community = createCommunity({ api, getMember: () => state.member });
-const extras = createExtras({ onSummary: updateNotificationBell, community, api, getMember: () => state.member, isActive: () => state.view === "more" && !!state.member && !state.member.must_change_password });
+const extras = createExtras({ getView: () => state.view, navigate: view => showView(view), onSummary: updateNotificationBell, community, api, getMember: () => state.member, isActive: () => extraViews.has(state.view) && !!state.member && !state.member.must_change_password });
 const safeRun = (fn) =>
   Promise.resolve()
     .then(fn)
@@ -220,6 +227,8 @@ function expireSession({ preserveRoute = true } = {}) {
     history.replaceState(null, "", location.pathname + "#dashboard");
   }
   state.epoch++;
+  smartClass.reset();
+  journey.reset();
   extras.reset();
   community.reset();
   abortRequests();
@@ -326,10 +335,12 @@ function showView(view, { load = true, updateUrl = true, replace = false, extras
   if (state.member.must_change_password) view = "account";
   if (view !== "account") clearPasswordReset();
   state.view = view;
-  if (view === "more") extras.open(extrasScreen);
+  if (extraViews.has(view)) extras.open(view === "more" ? extrasScreen : view);
   else extras.close();
+  if (view === "smart-class") smartClass.open(); else smartClass.close();
+  if (view === "journey" || view === "leaderboard") journey.open(view); else journey.close();
   if (view === "journey") updateJourney();
-  $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== view));
+  $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== (extraViews.has(view) ? "more" : view)));
   $$("[data-view]").forEach((button) => {
     const active = button.dataset.view === view;
     button.classList.toggle("active", active);
@@ -366,9 +377,7 @@ function activate(member) {
   $("#appShell").hidden = false;
   $$("[data-member-name]").forEach((n) => (n.textContent = member.name));
   $$("[data-member-unit]").forEach((n) => (n.textContent = member.unit_label));
-  $$("[data-member-initials]").forEach(
-    (n) => (n.textContent = initials(member.name)),
-  );
+  renderOwnAvatar(member);
   $$("[data-manager-only]").forEach(
     (n) => (n.hidden = member.role !== "cadre"),
   );
@@ -957,7 +966,7 @@ function renderMembers() {
       ? members
           .map(
             (m) =>
-              `<tr><td><div class="member-cell"><span class="avatar">${h(initials(m.name))}</span><span><b>${h(m.name)}</b><small>${h(m.unit_label)}</small></span></div></td><td><span class="muted">${h(m.unit_label)}</span></td><td>${badge(submissionStatus(m))}</td><td class="muted">${m.image_count ? formatDate(m.updated_at, true) : "—"}</td><td class="align-right">${m.image_count ? `<button class="button soft small" data-open-submission="${m.id}">${icon("folder")}${m.image_count} tệp</button>` : '<span class="muted">Chưa có tệp</span>'}</td></tr>`,
+              `<tr><td><div class="member-cell"><span class="avatar">${avatarMarkup(m)}</span><span><b>${h(m.name)}</b><small>${h(m.unit_label)}</small></span></div></td><td><span class="muted">${h(m.unit_label)}</span></td><td>${badge(submissionStatus(m))}</td><td class="muted">${m.image_count ? formatDate(m.updated_at, true) : "—"}</td><td class="align-right">${m.image_count ? `<button class="button soft small" data-open-submission="${m.id}">${icon("folder")}${m.image_count} tệp</button>` : '<span class="muted">Chưa có tệp</span>'}</td></tr>`,
           )
           .join("")
       : `<tr><td colspan="5">${empty("Không tìm thấy thành viên", "Thử đổi từ khóa hoặc bộ lọc.")}</td></tr>`,
@@ -1099,7 +1108,7 @@ function renderSharedMembers() {
     && (unit === "all" || m.unit_code === unit)
     && (status === "all" || submissionStatus(m) === status));
   loaded($("#sharedMembersBody"), members.length ? members.map(m =>
-    '<tr><td><div class="member-cell"><span class="avatar">' + h(initials(m.name)) +
+    '<tr><td><div class="member-cell"><span class="avatar">' + avatarMarkup(m) +
     '</span><span><b>' + h(m.name) + (m.member_id === state.member?.id ? " (Bạn)" : "") +
     '</b><small>' + h(m.unit_label) + '</small></span></div></td><td class="muted">' +
     h(m.unit_label) + '</td><td>' + badge(submissionStatus(m)) + '</td><td class="muted">' +
@@ -1286,8 +1295,16 @@ async function resetMemberPassword(event) {
 function bind() {
   setupUi();
   setupPreview();
+  setupAvatar({api, getMember: () => state.member, onChange: avatar_url => {
+    if (!state.member) return;
+    state.member.avatar_url = avatar_url;
+    renderOwnAvatar(state.member);
+    for (const member of [...state.members, ...state.sharedMembers])
+      if (Number(member.member_id) === state.member.id) member.avatar_url = avatar_url;
+    renderMembers();renderSharedMembers();
+  }});
   setupJourney();
-  $("#notificationBell").onclick = () => showView("more", { extrasScreen: "notices" });
+  $("#notificationBell").onclick = () => showView("notices");
   $("#copyManagerTask").onclick = () => safeRun(() => state.managerTask && copyTaskLink(state.managerTask.id));
   $("#copySharedTask").onclick = () => safeRun(() => state.sharedTask && copyTaskLink(state.sharedTask.id));
   $("#sharedTask").onchange = () => safeRun(() => openSharedTask(Number($("#sharedTask").value)));

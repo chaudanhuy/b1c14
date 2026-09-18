@@ -38,6 +38,7 @@ export function extensionForMime(type) {
     "image/webp": "webp",
 
     "application/pdf": "pdf",
+    "audio/mpeg": "mp3", "video/mp4": "mp4", "application/zip": "zip", "application/x-zip-compressed": "zip",
 
     "application/msword": "doc",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
