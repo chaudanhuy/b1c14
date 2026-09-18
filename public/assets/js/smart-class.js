@@ -8,6 +8,7 @@ export function createSmartClass({api,getMember}){
   const root=document.getElementById("smartClassRoot");
   let ws=null,active=false,generation=0,heartbeat,reconnect,ticker,attempt=0,s=null,offset=0,lastPong=0;
   let liveKey="",order=[],left=null,wrongPair=null,previewAt=0,audioContext=null,sound=true,confettiFrame=0,celebrated="",lastRound="";
+  const bank={questions:[],sets:[],detail:null,loaded:false,loading:false,tab:"bank",search:"",mode:"",category:"",editing:null};
   const pending=new Map();
   const allowed=()=>getMember()&&!getMember().must_change_password;
   const me=()=>s?.me;
@@ -94,19 +95,86 @@ export function createSmartClass({api,getMember}){
     if(queue){if(pending.size>=8){toast("Đang chờ máy chủ xác nhận.","info");return false;}pending.set(packet.id,packet);}
     ws.send(JSON.stringify(packet));return true;
   }
+  const canStart=()=>!!s?.session&&["LOBBY","SHOW_RESULT","LEADERBOARD"].includes(s.phase)&&ws?.readyState===1;
+  function formQuestion(){
+    const form=root.querySelector("#smartQuestionForm");if(!form)return null;
+    const values=Object.fromEntries(new FormData(form));
+    const q={mode:values.mode,prompt:values.prompt,duration:Number(values.duration)};
+    if(q.mode==="quiz"){q.options=["A","B","C","D"].map(l=>values["option"+l]);q.correct=values.correct;}
+    if(q.mode==="short"){q.accepted=values.accepted.split("\n").filter(x=>x.trim());q.ignoreAccents=values.ignoreAccents==="on";}
+    if(q.mode==="reorder")q.items=values.items.split("\n").filter(x=>x.trim());
+    if(q.mode==="estimate")for(const key of ["min","max","step","correct"])q[key]=Number(values[key]);
+    if(q.mode==="match")q.pairs=values.pairs.split("\n").filter(x=>x.trim()).map(x=>x.split("|").map(y=>y.trim()));
+    return q;
+  }
+  function fillQuestionForm(record=null){
+    const form=root.querySelector("#smartQuestionForm");if(!form)return;
+    const q=record?.question||{mode:"quiz",prompt:"",duration:20,options:["","","",""],correct:"A"};
+    form.reset();form.elements.mode.value=q.mode;form.elements.prompt.value=q.prompt||"";form.elements.duration.value=q.duration||20;modeFields(q.mode);
+    if(q.mode==="quiz"){["A","B","C","D"].forEach((l,i)=>form.elements["option"+l].value=q.options?.[i]||"");form.elements.correct.value=q.correct||"A";}
+    if(q.mode==="short"){form.elements.accepted.value=(q.accepted||[]).join("\n");form.elements.ignoreAccents.checked=q.ignoreAccents!==false;}
+    if(q.mode==="reorder")form.elements.items.value=(q.items||[]).join("\n");
+    if(q.mode==="estimate")for(const key of ["min","max","step","correct"])form.elements[key].value=q[key]??({min:0,max:100,step:1,correct:50}[key]);
+    if(q.mode==="match")form.elements.pairs.value=(q.pairs||[]).map(x=>x.join(" | ")).join("\n");
+    bank.editing=record;bank.tab="quick";renderMasterPanes();
+  }
+  async function loadBank(force=false){
+    if(bank.loading||bank.loaded&&!force)return;bank.loading=true;renderMasterPanes();
+    try{
+      const [questions,sets]=await Promise.all([api("/api/smart-class/questions"),api("/api/smart-class/question-sets")]);
+      bank.questions=questions.questions||[];bank.sets=sets.sets||[];bank.loaded=true;
+      if(bank.detail?.id){const detail=await api("/api/smart-class/question-sets?id="+encodeURIComponent(bank.detail.id));bank.detail=detail.set||null;}
+    }catch(error){toast(error.message,"error");}
+    finally{bank.loading=false;renderMasterPanes();}
+  }
+  function filteredQuestions(){
+    const text=bank.search.trim().toLocaleLowerCase("vi");
+    return bank.questions.filter(q=>(!bank.mode||q.mode===bank.mode)&&(!bank.category||q.category===bank.category)&&(!text||[q.title,q.prompt,q.category,MODES[q.mode]].some(v=>String(v||"").toLocaleLowerCase("vi").includes(text))));
+  }
+  function questionCard(q,compact=false){
+    const used=(s?.usedQuestionIds||[]).includes(q.id),rate=q.responses?Math.round(q.avg_accuracy*100):null;
+    return `<article class="smart-question-card ${used?"used":""}" data-question-id="${q.id}"><div class="smart-question-main"><div class="action-row"><span class="badge pending">${h(MODES[q.mode])}</span><span class="smart-category">${h(q.category||"Chung")}</span>${used?'<span class="badge approved">Đã hỏi</span>':""}</div><h3>${h(q.title||q.prompt)}</h3>${q.title!==q.prompt?`<p>${h(q.prompt)}</p>`:""}<small>${q.duration} giây · ${q.rounds||0} lượt dùng${rate===null?"":" · "+rate+"% chính xác"}</small></div><div class="action-row">${btn("bank-start","Bắt đầu","primary",!canStart())}${compact?"":btn("bank-edit","Sửa","soft")}${compact?"":btn("bank-duplicate","Nhân bản","ghost")}${compact?"":btn("bank-delete","Xóa","ghost")}</div></article>`;
+  }
+  function renderBankPane(){
+    const pane=root.querySelector("#smartBankPane");if(!pane)return;
+    const categories=[...new Set(bank.questions.map(q=>q.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"vi"));
+    pane.innerHTML=`<div class="smart-bank-head"><div><h3>Ngân hàng câu hỏi</h3><p class="muted">Chuẩn bị trước câu hỏi, đến giờ học chỉ việc chọn và bắt đầu.</p></div><div class="action-row">${btn("new-question","Soạn câu mới","primary")}${btn("import-json","Nhập JSON","soft")}${btn("export-json","Xuất JSON","ghost")}${btn("bank-refresh","Làm mới","ghost")}</div></div>
+      <div class="smart-bank-filters"><input name="bankSearch" value="${h(bank.search)}" placeholder="Tìm câu hỏi, chủ đề…"><select name="bankMode"><option value="">Tất cả chế độ</option>${Object.entries(MODES).map(([k,v])=>`<option value="${k}" ${bank.mode===k?"selected":""}>${v}</option>`).join("")}</select><select name="bankCategory"><option value="">Tất cả chủ đề</option>${categories.map(v=>`<option ${bank.category===v?"selected":""}>${h(v)}</option>`).join("")}</select></div>
+      <div id="smartBankList" class="smart-question-list">${bank.loading?'<p class="muted">Đang tải ngân hàng…</p>':filteredQuestions().length?filteredQuestions().map(q=>questionCard(q)).join(""):'<div class="empty-state"><h3>Chưa có câu hỏi phù hợp</h3><p>Soạn câu mới hoặc nhập danh sách JSON để bắt đầu.</p></div>'}</div>`;
+  }
+  function renderSetsPane(){
+    const pane=root.querySelector("#smartSetsPane");if(!pane)return;
+    if(bank.detail){
+      const ids=bank.detail.questions.map(q=>q.id),available=bank.questions.filter(q=>!ids.includes(q.id));
+      const next=bank.detail.questions.find(q=>!(s?.usedQuestionIds||[]).includes(q.id));
+      pane.innerHTML=`<div class="smart-bank-head"><div><button type="button" class="button ghost" data-smart="set-back">← Danh sách bộ đề</button><h3>${h(bank.detail.title)}</h3><p class="muted">${h(bank.detail.description||"Không có mô tả")}</p></div><div class="action-row">${btn("set-next","Bắt đầu câu tiếp theo","primary",!next||!canStart())}${btn("set-rename","Đổi tên","soft")}${btn("set-delete","Xóa bộ đề","ghost")}</div></div>
+        <div class="smart-set-add"><select id="smartSetAdd"><option value="">Chọn câu hỏi để thêm…</option>${available.map(q=>`<option value="${q.id}">${h(q.title)} · ${h(MODES[q.mode])}</option>`).join("")}</select>${btn("set-add","Thêm vào bộ đề","soft",!available.length)}</div>
+        <div class="smart-set-list">${bank.detail.questions.length?bank.detail.questions.map((q,i)=>`<div class="smart-set-row"><b>${i+1}</b><div>${questionCard(q,true)}</div><div class="smart-set-order">${btn("set-up","↑","ghost",i===0)}${btn("set-down","↓","ghost",i===bank.detail.questions.length-1)}${btn("set-remove","Bỏ","ghost")}</div></div>`).join(""):'<p class="muted">Bộ đề chưa có câu hỏi. Chọn một câu ở phía trên để thêm.</p>'}</div>`;
+      return;
+    }
+    pane.innerHTML=`<div class="smart-bank-head"><div><h3>Bộ câu hỏi / Đề thi</h3><p class="muted">Gom các câu đã chuẩn bị thành một trình tự dùng trong buổi học.</p></div>${btn("set-new","Tạo bộ đề","primary")}</div><div class="smart-set-grid">${bank.loading?'<p class="muted">Đang tải…</p>':bank.sets.length?bank.sets.map(set=>`<article class="smart-set-card"><h3>${h(set.title)}</h3><p class="muted">${h(set.description||"Không có mô tả")}</p><b>${set.item_count||0} câu hỏi</b><div class="action-row">${btn("set-open","Mở bộ đề","soft")}</div><span data-set-id="${set.id}" hidden></span></article>`).join(""):'<div class="empty-state"><h3>Chưa có bộ đề</h3><p>Tạo bộ đề rồi thêm câu hỏi từ ngân hàng.</p></div>'}</div>`;
+  }
+  function renderMasterPanes(){
+    const node=root.querySelector("#smartMaster");if(!node||node.hidden)return;
+    node.querySelectorAll("[data-smart-tab]").forEach(b=>b.classList.toggle("active",b.dataset.smartTab===bank.tab));
+    for(const [tab,id] of [["bank","smartBankPane"],["quick","smartQuickPane"],["sets","smartSetsPane"]]){const pane=root.querySelector("#"+id);if(pane)pane.hidden=bank.tab!==tab;}
+    const banner=root.querySelector("#smartEditBanner");if(banner)banner.innerHTML=bank.editing?`<div class="notice">Đang sửa: <b>${h(bank.editing.title)}</b> ${btn("edit-cancel","Hủy sửa","ghost")}</div>`:"";
+    const start=root.querySelector('#smartQuestionForm [type="submit"]');if(start)start.disabled=!canStart();
+    if(bank.tab==="bank")renderBankPane();if(bank.tab==="sets")renderSetsPane();
+  }
   function master(){
     const node=root.querySelector("#smartMaster"),controlling=me()?.controlling;
     node.hidden=!controlling;if(!controlling)return;
-    if(!node.querySelector("form")){
-      node.innerHTML=`<div class="panel-heading"><div><h2>Điều hành lớp học</h2><p>Đáp án tại đây chỉ hiện với người điều hành.</p></div></div>
-      <form id="smartQuestionForm" class="stack-form">
+    if(!node.querySelector("#smartQuestionForm")){
+      node.innerHTML=`<div class="panel-heading"><div><h2>Điều hành lớp học</h2><p>Chuẩn bị ngân hàng câu hỏi hoặc soạn nhanh ngay trong phiên.</p></div></div>
+      <div class="smart-tabs"><button type="button" class="button soft" data-smart-tab="bank">Ngân hàng câu hỏi</button><button type="button" class="button soft" data-smart-tab="sets">Bộ đề</button><button type="button" class="button soft" data-smart-tab="quick">Soạn nhanh</button></div>
+      <div id="smartBankPane"></div><div id="smartSetsPane" hidden></div><div id="smartQuickPane" hidden><div id="smartEditBanner"></div><form id="smartQuestionForm" class="stack-form">
       <label class="field"><span>Chế độ</span><select name="mode">${Object.entries(MODES).map(([key,label])=>`<option value="${key}">${label}</option>`).join("")}</select></label>
       ${field("prompt","Câu hỏi / yêu cầu","text","","maxlength=500")}${field("duration","Thời gian (giây)","number",20,"min=5 max=300")}
-      <div id="smartModeFields"></div><button type="submit" class="button primary">${icon("plus")} Bắt đầu câu hỏi</button></form>`;
-      modeFields("quiz");
+      <div id="smartModeFields"></div><div class="action-row"><button type="submit" class="button primary">${icon("plus")} Bắt đầu câu hỏi</button>${btn("save-question","Lưu vào ngân hàng","soft")}${btn("clear-question","Làm mới mẫu","ghost")}</div></form></div>`;
+      modeFields("quiz");void loadBank();
     }
-    const start=node.querySelector('[type="submit"]');
-    start.disabled=!s.session||!["LOBBY","SHOW_RESULT","LEADERBOARD"].includes(s.phase)||ws?.readyState!==1;
+    renderMasterPanes();
   }
   function modeFields(mode){
     let html="";
@@ -240,8 +308,13 @@ export function createSmartClass({api,getMember}){
       if(now-start<4000&&active&&canvas.isConnected)confettiFrame=window.requestAnimationFrame(frame);else canvas.remove();}
     confettiFrame=window.requestAnimationFrame(frame);
   }
-  root.addEventListener("change",event=>{if(event.target.name==="mode")modeFields(event.target.value);});
+  root.addEventListener("change",event=>{
+    if(event.target.name==="mode")modeFields(event.target.value);
+    if(event.target.name==="bankMode"){bank.mode=event.target.value;renderBankPane();}
+    if(event.target.name==="bankCategory"){bank.category=event.target.value;renderBankPane();}
+  });
   root.addEventListener("input",event=>{
+    if(event.target.name==="bankSearch"){bank.search=event.target.value;renderBankPane();return;}
     if(event.target.id!=="smartEstimate")return;
     const value=Number(event.target.value);root.querySelector("#smartEstimateValue").textContent=value;
     if(Date.now()-previewAt>200){previewAt=Date.now();send("ESTIMATE_PREVIEW",{value},false);}
@@ -251,16 +324,13 @@ export function createSmartClass({api,getMember}){
     const form=event.target,values=Object.fromEntries(new FormData(form));
     if(form.id==="smartShortForm"){send("SUBMIT_SHORT",{answer:values.answer});return;}
     if(form.id!=="smartQuestionForm")return;
-    const q={mode:values.mode,prompt:values.prompt,duration:Number(values.duration)};
-    if(q.mode==="quiz"){q.options=["A","B","C","D"].map(l=>values["option"+l]);q.correct=values.correct;}
-    if(q.mode==="short"){q.accepted=values.accepted.split("\n").filter(x=>x.trim());q.ignoreAccents=values.ignoreAccents==="on";}
-    if(q.mode==="reorder")q.items=values.items.split("\n").filter(x=>x.trim());
-    if(q.mode==="estimate")for(const key of ["min","max","step","correct"])q[key]=Number(values[key]);
-    if(q.mode==="match")q.pairs=values.pairs.split("\n").filter(x=>x.trim()).map(x=>x.split("|").map(y=>y.trim()));
+    const q=formQuestion();
     send("START_QUESTION",{question:q});
   });
   root.addEventListener("click",async event=>{
+    try{
     const target=event.target.closest("button");if(!target||target.disabled)return;
+    if(target.dataset.smartTab){bank.tab=target.dataset.smartTab;renderMasterPanes();return;}
     if(target.dataset.answer){send("SUBMIT_QUIZ",{answer:target.dataset.answer});return;}
     if(target.dataset.move){
       const i=Number(target.dataset.move),j=i+Number(target.dataset.direction);
@@ -272,7 +342,37 @@ export function createSmartClass({api,getMember}){
     }
     if(target.dataset.right){if(!left){toast("Chọn một ô bên trái trước.","info");return;}send("MATCH_PAIR",{left,right:target.dataset.right});left=null;return;}
     const action=target.dataset.smart,at=generation,session=s?.session?.id;
-    if(action==="claim")send("CLAIM_HOST");
+    const card=target.closest("[data-question-id]"),questionId=card?.dataset.questionId;
+    const setCard=target.closest(".smart-set-card"),setId=setCard?.querySelector("[data-set-id]")?.dataset.setId;
+    if(action==="new-question"){bank.editing=null;fillQuestionForm(null);}
+    else if(action==="clear-question"){bank.editing=null;fillQuestionForm(null);}
+    else if(action==="edit-cancel"){bank.editing=null;fillQuestionForm(null);}
+    else if(action==="bank-refresh")await loadBank(true);
+    else if(action==="bank-start"){const q=bank.questions.find(x=>x.id===questionId)||bank.detail?.questions.find(x=>x.id===questionId);if(q&&canStart())send("START_QUESTION",{question:{...q.question,bankId:q.id}});}
+    else if(action==="bank-edit"){const q=bank.questions.find(x=>x.id===questionId);if(q)fillQuestionForm(q);}
+    else if(action==="bank-duplicate"){if(questionId){await api("/api/smart-class/questions",{method:"POST",body:{action:"duplicate",id:questionId}});toast("Đã nhân bản câu hỏi.","success");await loadBank(true);}}
+    else if(action==="bank-delete"){if(questionId&&await modal({title:"Xóa câu hỏi?",description:"Câu hỏi sẽ bị gỡ khỏi mọi bộ đề. Kết quả các phiên cũ vẫn được giữ.",submit:"Xóa",danger:true})){await api("/api/smart-class/questions?id="+encodeURIComponent(questionId),{method:"DELETE"});toast("Đã xóa câu hỏi.","success");await loadBank(true);}}
+    else if(action==="save-question"){
+      const q=formQuestion();if(!q)return;const editing=bank.editing;
+      const result=await modal({title:editing?"Lưu thay đổi":"Lưu vào ngân hàng",fields:field("title","Tên gợi nhớ","text",editing?.title||q.prompt.slice(0,120),"maxlength=160")+field("category","Chủ đề","text",editing?.category||"Chung","maxlength=80"),submit:"Lưu",onSubmit:async values=>{const body={id:editing?.id,title:values.title,category:values.category,question:q};await api("/api/smart-class/questions",{method:editing?"PUT":"POST",body});return true;}});
+      if(result){toast(editing?"Đã cập nhật câu hỏi.":"Đã lưu câu hỏi.","success");bank.editing=null;bank.tab="bank";await loadBank(true);}
+    }else if(action==="import-json"){
+      const result=await modal({title:"Nhập câu hỏi từ JSON",description:"Dán một mảng câu hỏi hoặc { questions: [...] }. Tối đa 100 câu mỗi lần.",fields:`<label class="field"><span>JSON</span><textarea name="json" rows="12" required placeholder="Dán JSON câu hỏi tại đây"></textarea></label>`,submit:"Nhập",onSubmit:async values=>{let data;try{data=JSON.parse(values.json);}catch{throw new Error("JSON không hợp lệ.");}const items=Array.isArray(data)?data:data.questions;if(!Array.isArray(items))throw new Error("JSON phải là một mảng hoặc có trường questions.");await api("/api/smart-class/questions",{method:"POST",body:{action:"import",items}});return items.length;}});
+      if(result){toast(`Đã nhập ${result} câu hỏi.`,"success");await loadBank(true);}
+    }else if(action==="export-json"){
+      const data=JSON.stringify(bank.questions.map(q=>({title:q.title,category:q.category,question:q.question})),null,2),blob=new Blob([data],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="smart-class-question-bank.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),0);
+    }else if(action==="set-new"){
+      const result=await modal({title:"Tạo bộ đề",fields:field("title","Tên bộ đề","text","","maxlength=160")+'<label class="field"><span>Mô tả</span><textarea name="description" rows="4" maxlength="600"></textarea></label>',submit:"Tạo",onSubmit:async values=>{const data=await api("/api/smart-class/question-sets",{method:"POST",body:values});return data.id;}});
+      if(result){await loadBank(true);bank.detail=(await api("/api/smart-class/question-sets?id="+encodeURIComponent(result))).set;bank.tab="sets";renderMasterPanes();}
+    }else if(action==="set-open"){if(setId){bank.detail=(await api("/api/smart-class/question-sets?id="+encodeURIComponent(setId))).set;renderSetsPane();}}
+    else if(action==="set-back"){bank.detail=null;renderSetsPane();}
+    else if(action==="set-rename"){
+      const set=bank.detail;if(set){const result=await modal({title:"Sửa bộ đề",fields:field("title","Tên bộ đề","text",set.title,"maxlength=160")+`<label class="field"><span>Mô tả</span><textarea name="description" rows="4" maxlength="600">${h(set.description||"")}</textarea></label>`,submit:"Lưu",onSubmit:async values=>{await api("/api/smart-class/question-sets",{method:"PUT",body:{id:set.id,...values}});return true;}});if(result){bank.detail=(await api("/api/smart-class/question-sets?id="+encodeURIComponent(set.id))).set;await loadBank(true);}}
+    }else if(action==="set-delete"){const set=bank.detail;if(set&&await modal({title:"Xóa bộ đề?",description:"Câu hỏi trong ngân hàng không bị xóa.",submit:"Xóa",danger:true})){await api("/api/smart-class/question-sets?id="+encodeURIComponent(set.id),{method:"DELETE"});bank.detail=null;await loadBank(true);}}
+    else if(action==="set-add"){const id=root.querySelector("#smartSetAdd")?.value;if(id&&bank.detail){const ids=[...bank.detail.questions.map(q=>q.id),id];await api("/api/smart-class/question-sets",{method:"PUT",body:{id:bank.detail.id,question_ids:ids}});bank.detail=(await api("/api/smart-class/question-sets?id="+encodeURIComponent(bank.detail.id))).set;renderSetsPane();}}
+    else if(["set-up","set-down","set-remove"].includes(action)&&questionId&&bank.detail){let ids=bank.detail.questions.map(q=>q.id),i=ids.indexOf(questionId);if(action==="set-remove")ids.splice(i,1);else{const j=i+(action==="set-up"?-1:1);[ids[i],ids[j]]=[ids[j],ids[i]];}await api("/api/smart-class/question-sets",{method:"PUT",body:{id:bank.detail.id,question_ids:ids}});bank.detail=(await api("/api/smart-class/question-sets?id="+encodeURIComponent(bank.detail.id))).set;renderSetsPane();}
+    else if(action==="set-next"){const q=bank.detail?.questions.find(x=>!(s?.usedQuestionIds||[]).includes(x.id));if(q&&canStart())send("START_QUESTION",{question:{...q.question,bankId:q.id}});}
+    else if(action==="claim")send("CLAIM_HOST");
     else if(action==="session"){
       const result=await modal({title:"Tạo phiên Smart Class",fields:field("title","Tên phiên","text","Smart Class","maxlength=120"),submit:"Tạo phiên",onSubmit:values=>values.title});
       if(result&&active&&generation===at&&s?.session?.id===session)send("NEW_SESSION",{title:result});
@@ -286,6 +386,7 @@ export function createSmartClass({api,getMember}){
     else if(action==="estimate")send("SUBMIT_ESTIMATE",{value:Number(root.querySelector("#smartEstimate").value)});
     else if(action==="connect"){attempt=0;clearTimeout(reconnect);if(ws?.readyState===1)ws.send(JSON.stringify({type:"SYNC"}));else void connect();}
     else if(action==="sound"){sound=!sound;target.textContent="Âm thanh: "+(sound?"bật":"tắt");}
+    }catch(error){toast(error.message||"Không thể hoàn thành thao tác.","error");}
   });
   let dragging=null;
   root.addEventListener("dragstart",e=>{dragging=e.target.closest("[data-order-id]")?.dataset.orderId;if(dragging)e.dataTransfer.setData("text/plain",dragging);});
@@ -298,7 +399,7 @@ export function createSmartClass({api,getMember}){
   return {
     open(){if(active)return;active=true;generation++;shell();void connect();ticker=setInterval(tick,100);},
     close(){active=false;generation++;clearTimeout(reconnect);clearInterval(heartbeat);clearInterval(ticker);window.cancelAnimationFrame(confettiFrame);
-      if(ws){const socket=ws;ws=null;socket.close();}pending.clear();s=null;liveKey="";order=[];left=null;wrongPair=null;lastRound="";root.replaceChildren();},
+      if(ws){const socket=ws;ws=null;socket.close();}pending.clear();s=null;liveKey="";order=[];left=null;wrongPair=null;lastRound="";bank.detail=null;bank.editing=null;root.replaceChildren();},
     reset(){this.close();celebrated="";}
   };
 }

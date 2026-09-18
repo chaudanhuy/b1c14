@@ -12,6 +12,7 @@ export class SmartClassRoom {
     this.sql.exec("CREATE TABLE IF NOT EXISTS limits (member INTEGER PRIMARY KEY,window INTEGER NOT NULL,count INTEGER NOT NULL)");
     const saved=[...this.sql.exec("SELECT state FROM room WHERE id=1")][0];
     this.room=saved?JSON.parse(saved.state):initialState();
+    if(!Array.isArray(this.room.usedQuestionIds))this.room.usedQuestionIds=[];
   }
   attachment(ws){return ws.deserializeAttachment();}
   alive(ws,now=Date.now()){const a=this.attachment(ws);return a&&!a.closed&&ws.readyState===1&&a.last+LEASE>now&&a.exp*1000>now;}
@@ -46,8 +47,13 @@ export class SmartClassRoom {
         this.sql.exec("INSERT INTO outbox(id,payload) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
           "session:"+s.id,JSON.stringify({session:s}));
       }
-      if(ledger.length)this.sql.exec("INSERT OR IGNORE INTO outbox(id,payload) VALUES(?,?)",
-        "round:"+ledger[0].round_id,JSON.stringify({results:ledger}));
+      if(ledger.length){
+        const r=this.room.round;
+        this.sql.exec("INSERT OR IGNORE INTO outbox(id,payload) VALUES(?,?)",
+          "round:"+ledger[0].round_id,JSON.stringify({results:ledger,round:{
+            session_id:this.room.session.id,round_id:r.id,question_id:r.q.bankId||null,mode:r.q.mode,prompt:r.q.prompt,created_at:r.startedAt
+          }}));
+      }
       if(command){
         this.sql.exec("INSERT INTO commands(id,member,created) VALUES(?,?,?)",command,member,Date.now());
         this.sql.exec("DELETE FROM commands WHERE id IN (SELECT id FROM commands ORDER BY created DESC LIMIT -1 OFFSET 1024)");
@@ -162,6 +168,11 @@ export class SmartClassRoom {
         await this.env.DB.prepare("INSERT INTO smart_class_sessions(id,host_id,started_at,ended_at,title) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET ended_at=excluded.ended_at,title=excluded.title")
           .bind(s.id,s.host_id,s.started_at,s.ended_at,s.title).run();
       }else{
+        if(payload.round){
+          const r=payload.round;
+          await this.env.DB.prepare("INSERT OR IGNORE INTO smart_class_rounds(session_id,round_id,question_id,mode,prompt,created_at) VALUES(?,?,?,?,?,?)")
+            .bind(r.session_id,r.round_id,r.question_id,r.mode,r.prompt,r.created_at).run();
+        }
         const statements=payload.results.map(r=>this.env.DB.prepare("INSERT OR IGNORE INTO smart_class_results(session_id,round_id,member_id,mode,score,accuracy,elapsed_ms,responded,created_at) VALUES(?,?,?,?,?,?,?,?,?)")
           .bind(r.session_id,r.round_id,r.member_id,r.mode,r.score,r.accuracy,r.elapsed_ms,r.responded,r.created_at));
         for(let i=0;i<statements.length;i+=40)await this.env.DB.batch(statements.slice(i,i+40));

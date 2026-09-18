@@ -18,10 +18,11 @@ const shuffle = array => {
   for(let i=a.length-1;i>0;i--){const r=new Uint32Array(1);crypto.getRandomValues(r);const j=r[0]%(i+1);[a[i],a[j]]=[a[j],a[i]];}
   return a;
 };
-export function initialState(){return {phase:"LOBBY",session:null,host:null,round:null,scores:{},roundCount:0,version:0};}
+export function initialState(){return {phase:"LOBBY",session:null,host:null,round:null,scores:{},roundCount:0,usedQuestionIds:[],version:0};}
 export function question(input) {
   if(!input || !MODES.includes(input.mode))fail("Chế độ không hợp lệ.");
   const q={mode:input.mode,prompt:clean(input.prompt),duration:Math.round(number(input.duration,5,300))};
+  if(typeof input.bankId==="string"&&/^[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}$/i.test(input.bankId))q.bankId=input.bankId;
   if(q.mode==="quiz"){
     if(!Array.isArray(input.options)||input.options.length!==4)fail("Cần đúng 4 đáp án.");
     q.options=input.options.map(x=>clean(x,200));
@@ -105,13 +106,15 @@ export function apply(s,me,data,now,peers) {
     if(!["LOBBY","FINISHED"].includes(s.phase)||s.session&&s.phase!=="FINISHED")fail("Hãy kết thúc phiên hiện tại trước.");
     const title=clean(data.title||"Smart Class",120);
     s.session={id:uid(),host_id:me.id,title,started_at:now,ended_at:null};
-    s.round=null;s.scores={};s.roundCount=0;s.phase="LOBBY";
+    s.round=null;s.scores={};s.roundCount=0;s.usedQuestionIds=[];s.phase="LOBBY";
   } else if(data.type==="START_QUESTION"){
     host();
     if(!s.session||!["LOBBY","SHOW_RESULT","LEADERBOARD"].includes(s.phase))fail("Tạo phiên hoặc công bố kết quả vòng trước trước khi bắt đầu.");
     if(data.sessionId!==s.session.id)fail("Phiên đã thay đổi.");
     if(s.roundCount>=100)fail("Đã đủ 100 vòng. Hãy kết thúc và tạo phiên mới.");
     const q=question(data.question);
+    s.usedQuestionIds ||= [];
+    if(q.bankId&&!s.usedQuestionIds.includes(q.bankId))s.usedQuestionIds.push(q.bankId);
     const participants=peers.filter(p=>p.role==="student").map(({id,name})=>({id,name}));
     if(!participants.length)fail("Chưa có học viên trực tuyến.");
     s.round={id:uid(),q,startedAt:now,deadline:now+q.duration*1000,participants,answers:{},previews:{},buzzerLocked:false,winner:null,results:null};
@@ -203,6 +206,7 @@ export function snapshot(s,me,peers,now) {
     }
   }
   return {type:"STATE",server_now:now,version:s.version,phase:s.phase,session:s.session,host:s.host,
+    usedQuestionIds:Array.isArray(s.usedQuestionIds)?s.usedQuestionIds:[],
     me:{id:me.id,name:me.name,role:me.role,controlling:host},members:peers,round,
     leaderboard:host||revealed?leaderboard(s):[]};
 }
