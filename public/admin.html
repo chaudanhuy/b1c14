@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f5f6fb" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Quản lý · ĐH31LQA</title>
+    <link rel="icon" href="/assets/brand.svg" type="image/svg+xml" />
+    <script src="/assets/js/theme.js"></script>
+    <link rel="stylesheet" href="/assets/css/main.css?v=6" />
+    <link rel="stylesheet" href="/assets/css/extras.css?v=6" />
+    <link rel="stylesheet" href="/assets/css/community.css?v=1" />
+    <script type="module" src="/assets/js/app.js?v=6"></script>
+  </head>
+  <body data-entry="manager">
+    <!-- Background mesh -->
+    <div style="position: fixed; inset: 0; z-index: -10; overflow: hidden; pointer-events: none;">
+      <div class="animate-blob1" style="position: absolute; border-radius: 9999px; filter: blur(64px); top: -10%; left: -10%; width: 500px; height: 500px; background: rgba(147,51,234,0.30)"></div>
+      <div class="animate-blob2" style="position: absolute; border-radius: 9999px; filter: blur(64px); top: 15%; right: -15%; width: 600px; height: 600px; background: rgba(6,182,212,0.20)"></div>
+      <div class="animate-blob3" style="position: absolute; border-radius: 9999px; filter: blur(64px); bottom: -15%; left: 20%; width: 550px; height: 550px; background: rgba(16,185,129,0.18)"></div>
+      <div style="position: absolute; inset: 0; background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0); background-size: 38px 38px;"></div>
+    </div>
+    <a class="skip-link" href="#mainContent">Đến nội dung chính</a>
+    <section id="loginScreen" class="login-screen" aria-label="Đăng nhập">
+      <div class="login-story">
+        <a class="brand" href="/"
+          ><span class="brand-mark"><img src="/assets/logo.jpg" alt="Logo đơn vị" />
+          </span>
+          <span><b>ĐH31LQA</b><small>ĐẠI ĐỘI 14</small></span></a
+        >
+        <div class="login-copy">
+          <span class="eyebrow">CỔNG THÔNG TIN NỘI BỘ</span>
+          <h1>
+            Cùng một lớp.<br />
+            Cùng một nhịp.
+          </h1>
+          <p>
+            Theo dõi nhiệm vụ, gửi minh chứng và kết nối công việc của đơn vị
+            trong một không gian chung.
+          </p>
+          <div class="login-illustration" aria-hidden="true">
+            <div class="illustration-top">
+              <span class="illustration-symbol" data-icon="layers"></span
+              ><span
+                ><b>Công việc trong tầm tay</b
+                ><small>Mỗi nhiệm vụ, một bước tiến</small></span
+              ><span class="mini-dot"></span>
+            </div>
+            <div class="illustration-line">
+              <span class="check-dot" data-icon="check"></span
+              ><span>Nhận nhiệm vụ</span><i></i>
+            </div>
+            <div class="illustration-line">
+              <span class="check-dot" data-icon="check"></span
+              ><span>Gửi minh chứng</span><i></i>
+            </div>
+            <div class="illustration-line">
+              <span class="step-dot">3</span><span>Theo dõi kết quả</span
+              ><i></i>
+            </div>
+          </div>
+        </div>
+        <p class="login-footer">
+          ĐH31LQA <span>•</span> Không gian làm việc của chúng ta
+        </p>
+      </div>
+      <main class="login-main">
+        <div class="login-tools">
+          <button
+            class="icon-button"
+            data-theme-cycle
+            aria-label="Đổi giao diện sáng/tối"
+            title="Đổi giao diện"
+          >
+            <span data-icon="sun"></span>
+          </button>
+        </div>
+        <div class="login-card">
+          <span class="pill"
+            ><span class="mini-dot"></span> Sẵn sàng cho ngày mới</span
+          >
+          <h2>Chào mừng trở lại</h2>
+          <p class="muted">Đăng nhập bằng tài khoản của bạn để tiếp tục.</p>
+          <form id="loginForm" class="stack-form">
+            <label class="field"
+              ><span>Họ và tên</span
+              ><input
+                id="usernameInput"
+                type="text"
+                autocomplete="username"
+                placeholder="Nhập họ và tên"
+                required /></label
+            >
+            <label class="field"
+              ><span>Mật khẩu</span
+              ><span class="password-field"
+                ><input
+                  id="passwordInput"
+                  type="password"
+                  autocomplete="current-password"
+                  maxlength="256"
+                  placeholder="Nhập mật khẩu của bạn"
+                  required /><button
+                  type="button"
+                  class="icon-button"
+                  data-password-toggle="passwordInput"
+                  aria-label="Hiện mật khẩu"
+                >
+                  <span data-icon="eye"></span></button></span
+            ></label>
+            <p id="loginMessage" class="inline-message" role="status"></p>
+            <button id="loginButton" class="button primary full" type="submit">
+              Đăng nhập <span data-icon="arrow-right"></span>
+            </button>
+          </form>
+          <p class="login-help">
+            <span data-icon="shield"></span> 
+            <span>
+              Nếu quên mật khẩu, liên hệ Châu Đan Huy để cấp lại.
+              <br>
+              Tuyệt đối không chia sẻ tài liệu quân sự, tài liệu nhạy cảm.
+              <br>
+              Không chia sẻ tài khoản cho bất kỳ ai không thuộc đơn vị. 
+            </span>
+          </p>
+          <button
+            id="retryLogin"
+            class="button ghost full"
+            type="button"
+            hidden
+          >
+            Thử tải lại danh sách
+          </button>
+        </div>
+        <span class="login-version">Thiết kế bởi Châu Đan Huy & GPT-6 Astra</span>
+      </main>
+    </section>
+    <div id="appShell" class="app-shell" hidden>
+      <aside id="sidebar" class="sidebar" aria-label="Menu chính">
+        <div class="sidebar-brand">
+          <a
+            class="brand"
+            href="#dashboard"
+            data-view="dashboard"
+            title="Tổng quan"
+            ><span class="brand-mark"><img src="/assets/logo.jpg" alt="Logo đơn vị" />
+            </span><span class="sidebar-copy"
+              ><b>ĐH31LQA</b><small>CỔNG NỘI BỘ</small></span
+            ></a
+          ><button
+            id="closeMenu"
+            class="icon-button mobile-only"
+            aria-label="Đóng menu"
+          >
+            <span data-icon="x"></span>
+          </button>
+        </div>
+        <nav class="nav-list" aria-label="Điều hướng chính">
+<span class="nav-label">HỌC TẬP & NHIỆM VỤ</span>
+<button type="button" class="nav-item" data-view="dashboard" title="Tổng quan"><span data-icon="grid"></span><span class="nav-text">Tổng quan</span></button>
+<button type="button" class="nav-item" data-view="tasks" title="Nhiệm vụ của tôi"><span data-icon="check-square"></span><span class="nav-text">Nhiệm vụ của tôi</span><span id="navTaskCount" class="nav-count">0</span></button>
+<button type="button" class="nav-item" data-view="submit" title="Gửi minh chứng"><span data-icon="upload"></span><span class="nav-text">Gửi minh chứng</span></button>
+<button type="button" class="nav-item" data-view="leaderboard" title="Bảng xếp hạng"><span data-icon="activity"></span><span class="nav-text">Bảng xếp hạng</span></button>
+<button type="button" class="nav-item" data-view="manager" title="Quản lý minh chứng" data-manager-only hidden><span data-icon="users"></span><span class="nav-text">Quản lý minh chứng</span></button>
+<span class="nav-label">TƯƠNG TÁC LỚP HỌC</span>
+<button type="button" class="nav-item" data-view="smart-class" title="Smart Class"><span data-icon="grid"></span><span class="nav-text">Smart Class</span></button>
+<button type="button" class="nav-item" data-view="lqa-message" title="LQA-Message"><span data-icon="users"></span><span class="nav-text">LQA-Message</span></button>
+<button type="button" class="nav-item" data-view="journey" title="Hành trình"><span data-icon="activity"></span><span class="nav-text">Hành trình</span></button>
+<button type="button" class="nav-item" data-view="mail" title="Hộp thư"><span data-icon="file"></span><span class="nav-text">Hộp thư</span></button>
+<button type="button" class="nav-item" data-view="events" title="Đếm ngược sự kiện"><span data-icon="clock"></span><span class="nav-text">Đếm ngược sự kiện</span></button>
+<span class="nav-label">TÀI NGUYÊN & TIỆN ÍCH</span>
+<button type="button" class="nav-item" data-view="files" title="Tài liệu của tôi"><span data-icon="folder"></span><span class="nav-text">Tài liệu của tôi</span></button>
+<button type="button" class="nav-item" data-view="links" title="Liên kết nhanh"><span data-icon="link"></span><span class="nav-text">Liên kết nhanh</span></button>
+<button type="button" class="nav-item" data-view="notices" title="Bảng thông báo"><span data-icon="bell"></span><span class="nav-text">Bảng thông báo</span></button>
+<button type="button" class="nav-item" data-view="account" title="Tài khoản"><span data-icon="settings"></span><span class="nav-text">Tài khoản</span></button>
+<button type="button" class="nav-item" data-view="more" title="Thêm" id="moreSidebarButton"><span data-icon="plus"></span><span class="nav-text">Thêm</span></button>
+</nav>
+        <div class="sidebar-foot">
+          <div class="sidebar-person">
+            <span class="avatar" data-member-initials></span
+            ><span class="sidebar-copy"
+              ><b data-member-name></b><small data-member-unit></small
+            ></span>
+          </div>
+          <button id="logoutButton" class="nav-item" title="Đăng xuất">
+            <span data-icon="logout"></span
+            ><span class="nav-text">Đăng xuất</span>
+          </button>
+        </div>
+      </aside>
+      <button
+        id="sidebarBackdrop"
+        class="sidebar-backdrop"
+        aria-label="Đóng menu"
+        hidden
+      ></button>
+      <div class="main-shell">
+        <header class="topbar">
+          <div class="topbar-start">
+            <button
+              id="menuButton"
+              class="icon-button"
+              aria-label="Mở hoặc thu gọn menu"
+              aria-controls="sidebar"
+              aria-expanded="true"
+            >
+              <span data-icon="panel"></span>
+            </button>
+            <div class="breadcrumb">
+              <span>Không gian làm việc</span
+              ><span class="crumb-divider">/</span
+              ><b id="pageTitle">Tổng quan</b>
+            </div>
+          </div>
+          <div class="topbar-end">
+            <span class="today" id="todayLabel"></span
+            ><button
+              class="icon-button"
+              data-theme-cycle
+              title="Đổi giao diện"
+              aria-label="Đổi giao diện sáng/tối"
+            >
+              <span data-icon="sun"></span></button
+            ><button id="notificationBell" class="icon-button notification-bell" type="button"
+              title="Bảng thông báo" aria-label="Bảng thông báo" aria-controls="extrasRoot">
+              <span data-icon="bell"></span><span id="notificationBadge" class="badge pending notification-count" hidden></span>
+            </button><button
+              class="avatar avatar-button"
+              data-view="account"
+              data-member-initials
+              aria-label="Tài khoản của tôi"
+            ></button>
+          </div>
+        </header>
+        <main id="mainContent" class="content" tabindex="-1">
+          <div id="defaultPasswordBanner" class="notice" hidden>
+            <span data-icon="shield"></span>
+            <p>Bạn đang dùng mật khẩu mặc định. Hãy đổi để bảo vệ tài khoản.</p>
+            <button class="button small ghost" data-view="account">
+              Đổi mật khẩu <span data-icon="arrow-right"></span>
+            </button>
+          </div>
+          <section data-panel="dashboard" class="view">
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">MỖI NGÀY MỘT BƯỚC TIẾN</span>
+                <h1 id="greeting">Chào bạn!</h1>
+                <p class="muted">
+                  Mọi nhiệm vụ và tiến độ của bạn, ngay tại đây.
+                </p>
+              </div>
+              <button class="button primary" data-view="submit">
+                <span data-icon="plus"></span> Gửi minh chứng
+              </button>
+            </div>
+            <div id="dashboardStats" class="stat-grid" aria-live="polite"></div>
+            <div class="dashboard-grid">
+              <article class="panel progress-card">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Tiến độ của bạn</h2>
+                    <p>Những nhiệm vụ đang mở</p>
+                  </div>
+                  <span class="surface-icon indigo" data-icon="activity"></span>
+                </div>
+                <div class="completion-display">
+                  <div id="completionRing" class="completion-ring">
+                    <span
+                      ><b id="completionPercent">0%</b
+                      ><small>hoàn thành</small></span
+                    >
+                  </div>
+                  <div>
+                    <h3 id="completionLabel">Đang tải tiến độ…</h3>
+                    <p class="muted">
+                      Hoàn thành khi có ít nhất một tệp minh chứng.
+                    </p>
+                    <button class="button soft" data-view="tasks">
+                      Xem nhiệm vụ <span data-icon="arrow-right"></span>
+                    </button>
+                  </div>
+                </div>
+              </article>
+              <article class="panel deadline-card">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Ưu tiên tiếp theo</h2>
+                    <p>Các nhiệm vụ bạn cần chú ý</p>
+                  </div>
+                  <span class="surface-icon amber" data-icon="clock"></span>
+                </div>
+                <div id="upcomingList"></div>
+              </article>
+            </div>
+            <div class="section-heading">
+              <h2>Lối tắt của bạn</h2>
+              <span class="muted">Bắt đầu chỉ với một chạm</span>
+            </div>
+            <div class="shortcut-grid">
+              <button class="shortcut" data-view="submit">
+                <span class="surface-icon indigo" data-icon="upload"></span
+                ><span
+                  ><b>Gửi minh chứng</b
+                  ><small>Ảnh, tài liệu và báo cáo</small></span
+                ><span data-icon="arrow-right"></span></button
+              ><button class="shortcut" data-view="files">
+                <span class="surface-icon teal" data-icon="folder"></span
+                ><span
+                  ><b>Tài liệu của tôi</b
+                  ><small>Xem lại và tải xuống</small></span
+                ><span data-icon="arrow-right"></span></button
+              ><button class="shortcut" data-view="account">
+                <span class="surface-icon rose" data-icon="shield"></span
+                ><span
+                  ><b>Quản lý tài khoản</b
+                  ><small>Thông tin và mật khẩu</small></span
+                ><span data-icon="arrow-right"></span>
+              </button>
+            </div>
+          </section>
+          <section data-panel="tasks" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">CÔNG VIỆC CÁ NHÂN</span>
+                <h1>Nhiệm vụ của tôi</h1>
+                <p class="muted">
+                  Theo dõi hạn chót và tiến độ nộp minh chứng.
+                </p>
+              </div>
+              <div class="action-row">
+                <button class="button soft" data-view="shared"><span data-icon="users"></span> Minh chứng đơn vị</button>
+                <button class="button soft" data-refresh="tasks"><span data-icon="refresh"></span> Làm mới</button>
+              </div>
+            </div>
+            <div class="toolbar panel">
+              <label class="search-box"
+                ><span data-icon="search"></span
+                ><input
+                  id="taskSearch"
+                  type="search"
+                  placeholder="Tìm theo tên nhiệm vụ…"
+                  aria-label="Tìm nhiệm vụ" /></label
+              ><label class="sr-only" for="taskStatus"
+                >Lọc trạng thái nhiệm vụ</label
+              ><select id="taskStatus">
+                <option value="all">Tất cả trạng thái</option>
+                <option value="not_submitted">Chưa nộp</option>
+                <option value="approved">Hoàn thành</option>
+                <option value="incomplete">Chưa hoàn thành</option></select
+              ><label class="sr-only" for="taskDeadline">Lọc hạn chót</label
+              ><select id="taskDeadline">
+                <option value="all">Tất cả hạn chót</option>
+                <option value="soon">Sắp hết hạn (3 ngày)</option>
+                <option value="overdue">Đã hết hạn</option>
+                <option value="archive">Đã đóng</option>
+              </select>
+            </div>
+            <div class="list-summary" id="taskSummary"></div>
+            <div id="taskList" class="task-grid"></div>
+          </section>
+          <section data-panel="submit" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">MINH CHỨNG CÁ NHÂN</span>
+                <h1>Gửi minh chứng</h1>
+                <p class="muted">
+                  Chọn nhiệm vụ và gửi minh chứng để hoàn thành.
+                </p>
+              </div>
+              <button class="button soft" data-view="files">
+                <span data-icon="folder"></span> Tài liệu đã gửi
+              </button>
+            </div>
+            <div class="upload-layout">
+              <article class="panel">
+                <form id="uploadForm" class="stack-form">
+                  <fieldset id="uploadFields">
+                    <label class="field"
+                      ><span>Nhiệm vụ cần minh chứng</span
+                      ><select id="uploadTask" required>
+                        <option value="">Chọn nhiệm vụ…</option>
+                      </select></label
+                    >
+                    <div id="uploadTaskInfo" class="task-info"></div>
+                    <div
+                      id="dropZone"
+                      class="drop-zone"
+                      role="button"
+                      tabindex="0"
+                      aria-label="Kéo thả hoặc chọn tệp"
+                    >
+                      <span class="upload-cloud" data-icon="cloud"></span>
+                      <h3>Kéo thả tài liệu vào đây</h3>
+                      <p>hoặc chọn tệp từ thiết bị của bạn</p>
+                      <span class="button soft"
+                        >Chọn tài liệu <span data-icon="plus"></span></span
+                      ><small
+                        >JPG, PNG, WebP, PDF, Word, Excel, PowerPoint, MP3, MP4, ZIP</small
+                      >
+                    </div>
+                    <input
+                      id="fileInput"
+                      type="file"
+                      multiple
+                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp3,.mp4,.zip"
+                      hidden
+                    /><input
+                      id="cameraInput"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      hidden
+                    /><input
+                      id="replaceInput"
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp3,.mp4,.zip"
+                      hidden
+                    />
+                    <div class="upload-options">
+                      <button
+                        id="cameraButton"
+                        class="button ghost"
+                        type="button"
+                      >
+                        <span data-icon="camera"></span> Chụp ảnh</button
+                      ><label class="check-label"
+                        ><input id="compressImages" type="checkbox" checked />
+                        Tối ưu dung lượng ảnh</label
+                      >
+                    </div>
+                    <div id="selectedWrap" hidden>
+                      <div class="section-heading">
+                        <b id="selectedSummary"></b
+                        ><button
+                          id="clearSelected"
+                          class="text-button danger-text"
+                          type="button"
+                        >
+                          Bỏ chọn tất cả
+                        </button>
+                      </div>
+                      <div id="selectedFiles" class="selected-files"></div>
+                    </div>
+                  </fieldset>
+                  <div id="uploadProgressWrap" class="upload-progress" hidden>
+                    <div>
+                      <b id="uploadProgressLabel">Đang chuẩn bị…</b
+                      ><span id="uploadProgressValue">0%</span>
+                    </div>
+                    <progress
+                      id="uploadProgress"
+                      value="0"
+                      max="100"
+                      aria-label="Tiến trình tải lên"
+                    ></progress>
+                  </div>
+                  <button
+                    id="submitButton"
+                    class="button primary full"
+                    type="submit"
+                  >
+                    <span data-icon="upload"></span> Gửi minh chứng
+                  </button>
+                  <p
+                    id="uploadMessage"
+                    class="inline-message"
+                    role="status"
+                  ></p>
+                </form>
+              </article>
+              <aside class="upload-guide">
+                <article class="panel">
+                  <span
+                    class="surface-icon teal"
+                    data-icon="check-square"
+                  ></span>
+                  <h2>Gửi một lần, theo dõi dễ dàng</h2>
+                  <ol class="steps">
+                    <li>
+                      <b>Chọn đúng nhiệm vụ</b
+                      ><span>Kiểm tra yêu cầu và hạn chót.</span>
+                    </li>
+                    <li>
+                      <b>Kiểm tra tài liệu</b
+                      ><span
+                        >Bấm vào ảnh để xem trước. Bạn có thể xóa hoặc thay tệp
+                        đã chọn.</span
+                      >
+                    </li>
+                    <li>
+                      <b>Gửi là hoàn thành</b
+                      ><span
+                        >Nộp thành công ít nhất một tệp là hoàn thành nhiệm vụ.</span
+                      >
+                    </li>
+                  </ol>
+                </article>
+                <div class="tip">
+                  <span data-icon="info"></span>
+                  <p>
+                    Tối đa <b>10 tệp/lần</b>, <b>20 MB/tệp</b> và
+                    <b>25 MB/lần gửi</b>. Mỗi nhiệm vụ lưu tối đa 50 tệp. Tệp
+                    Word, Excel, PDF được giữ nguyên nội dung.
+                  </p>
+                </div>
+              </aside>
+            </div>
+          </section>
+          <section data-panel="files" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">KHO TÀI LIỆU CÁ NHÂN</span>
+                <h1>Tài liệu của tôi</h1>
+                <p class="muted">
+                  Tất cả minh chứng đã gửi, kể cả nhiệm vụ đã đóng.
+                </p>
+              </div>
+              <button class="button soft" data-refresh="files">
+                <span data-icon="refresh"></span> Làm mới
+              </button>
+            </div>
+            <article class="panel">
+              <div class="toolbar flat">
+                <label class="field grow"
+                  ><span>Nhiệm vụ</span
+                  ><select id="filesTask">
+                    <option value="">Chọn nhiệm vụ…</option>
+                  </select></label
+                ><span id="myFileCount" class="muted"></span>
+              </div>
+              <div id="submissionStatus"></div>
+              <div id="myFilesGrid" class="file-grid"></div>
+              <div id="reviewHistory" hidden></div>
+            </article>
+          </section>
+          <section data-panel="shared" class="view" hidden>
+            <div class="page-heading">
+              <div><span class="eyebrow">TÀI LIỆU TRONG ĐƠN VỊ</span><h1>Minh chứng đơn vị</h1>
+                <p class="muted">Xem và tải tài liệu theo nhiệm vụ. Bài nộp của thành viên khác chỉ có quyền xem.</p></div>
+              <button class="button soft" data-view="tasks"><span data-icon="check-square"></span> Nhiệm vụ của tôi</button>
+            </div>
+            <article class="panel manager-panel">
+              <div class="toolbar flat"><label class="field grow"><span>Nhiệm vụ đang xem</span>
+                <select id="sharedTask"><option value="">Chọn nhiệm vụ…</option></select></label>
+                <button class="icon-button" data-refresh="shared" aria-label="Làm mới minh chứng đơn vị"><span data-icon="refresh"></span></button>
+              </div>
+              <h2 id="sharedTaskTitle"></h2><div id="sharedTaskMeta" class="muted"></div>
+              <p id="sharedTaskDescription" class="muted"></p>
+              <div class="toolbar flat"><label class="search-box"><span data-icon="search"></span>
+                <input id="sharedSearch" type="search" placeholder="Tìm thành viên…" aria-label="Tìm thành viên trong nhiệm vụ"></label>
+                <select id="sharedUnit" aria-label="Lọc tiểu đội"><option value="all">Tất cả tiểu đội</option><option value="cadre">Cán bộ trung đội</option><option value="1">Tiểu đội 1</option><option value="2">Tiểu đội 2</option><option value="3">Tiểu đội 3</option></select>
+                <select id="sharedStatus" aria-label="Lọc trạng thái nộp"><option value="all">Tất cả trạng thái</option><option value="approved">Đã nộp</option><option value="not_submitted">Chưa nộp</option></select>
+              </div>
+              <div class="table-wrap"><table class="member-table">
+                <thead><tr><th>THÀNH VIÊN</th><th>TIỂU ĐỘI</th><th>TRẠNG THÁI</th><th>CẬP NHẬT</th><th class="align-right">MINH CHỨNG</th></tr></thead>
+                <tbody id="sharedMembersBody"></tbody>
+              </table></div>
+              <div class="table-footer"><span id="sharedSummary" class="muted"></span><div class="action-row">
+                <button id="sharedMyFiles" class="button ghost small" disabled><span data-icon="folder"></span> Bài của tôi</button>
+                <button id="sharedSubmit" class="button soft small" disabled><span data-icon="upload"></span> Gửi minh chứng của tôi</button>
+                <button id="copySharedTask" class="button ghost small" disabled><span data-icon="link"></span> Sao chép liên kết</button>
+              </div></div>
+            </article>
+          </section>
+          <section data-panel="manager" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">QUẢN LÝ ĐƠN VỊ</span>
+                <h1>Quản lý minh chứng</h1>
+                <p class="muted">
+                  Nắm tiến độ chung và xem minh chứng của thành viên.
+                </p>
+              </div>
+              <button id="newTaskButton" class="button primary">
+                <span data-icon="plus"></span> Tạo nhiệm vụ
+              </button>
+            </div>
+            <div id="unitOverview" class="unit-grid"></div>
+            <article class="panel manager-panel">
+              <div class="toolbar flat">
+                <label class="field grow"
+                  ><span>Nhiệm vụ đang xem</span
+                  ><select id="managerTask">
+                    <option value="">Chọn nhiệm vụ…</option>
+                  </select></label
+                >
+                <div class="action-row">
+                  <button
+                    class="icon-button"
+                    data-refresh="manager"
+                    title="Làm mới"
+                    aria-label="Làm mới danh sách quản lý"
+                  >
+                    <span data-icon="refresh"></span></button
+                  ><button id="editTaskButton" class="button soft small">
+                    <span data-icon="edit"></span> Sửa</button
+                  ><button id="toggleTaskButton" class="button soft small">
+                    Đóng nhận bài</button
+                  ><button
+                    id="deleteTaskButton"
+                    class="icon-button danger-text"
+                    aria-label="Xóa nhiệm vụ"
+                    title="Xóa nhiệm vụ"
+                  >
+                    <span data-icon="trash"></span>
+                  </button>
+                </div>
+              </div>
+              <div id="managerTaskMeta" class="muted"></div>
+              <div id="managerStats" class="mini-stat-grid"></div>
+              <div id="managerTaskChart"></div>
+              <div class="toolbar flat">
+                <label class="search-box"
+                  ><span data-icon="search"></span
+                  ><input
+                    id="memberSearch"
+                    type="search"
+                    placeholder="Tìm thành viên…"
+                    aria-label="Tìm thành viên" /></label
+                ><select id="memberUnit" aria-label="Lọc tiểu đội">
+                  <option value="all">Tất cả tiểu đội</option>
+                  <option value="cadre">Cán bộ trung đội</option>
+                  <option value="1">Tiểu đội 1</option>
+                  <option value="2">Tiểu đội 2</option>
+                  <option value="3">Tiểu đội 3</option></select
+                ><select id="memberStatus" aria-label="Lọc bài nộp">
+                  <option value="all">Tất cả trạng thái</option>
+                    <option value="not_submitted">Chưa nộp</option>
+                  <option value="approved">Hoàn thành</option>
+                  </select>
+              </div>
+              <div class="table-wrap">
+                <table class="member-table">
+                  <thead>
+                    <tr>
+                      <th>THÀNH VIÊN</th>
+                      <th>TIỂU ĐỘI</th>
+                      <th>TRẠNG THÁI</th>
+                      <th>CẬP NHẬT</th>
+                      <th class="align-right">MINH CHỨNG</th>
+                    </tr>
+                  </thead>
+                  <tbody id="membersBody"></tbody>
+                </table>
+              </div>
+              <div class="table-footer">
+                <span id="memberSummary" class="muted"></span>
+                <div class="action-row">
+                  <button id="exportExcel" class="button ghost small">
+                    <span data-icon="sheet"></span> Xuất Excel</button
+                  ><button id="exportZip" class="button ghost small">
+                    <span data-icon="download"></span> Tải ZIP nhiệm vụ
+                  </button>
+                  <button id="copyManagerTask" type="button" class="button ghost small" disabled>
+                    <span data-icon="link"></span> Sao chép liên kết
+                  </button>
+                </div>
+              </div>
+            </article>
+          </section>
+          <section data-panel="journey" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">MỖI NGÀY MỘT BƯỚC TRƯỞNG THÀNH</span>
+                <h1>Hành trình</h1>
+                <p class="muted">Từng ngày rèn luyện, thêm một bước gần ngày tốt nghiệp.</p>
+              </div>
+            </div>
+            <article class="panel journey-card" aria-labelledby="journeyHeading">
+              <div class="journey-heading">
+                <div><span class="eyebrow">NĂNG LƯỢNG HÀNH TRÌNH</span><h2 id="journeyHeading">Kiên trì hôm nay, vững vàng ngày mai</h2></div>
+                <strong id="journeyPercent" class="journey-percent">0,00%</strong>
+              </div>
+              <div id="journeyBar" class="journey-energy" role="progressbar" aria-label="Tiến độ từ ngày nhập ngũ đến ngày tốt nghiệp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="journeyFill" class="journey-energy-fill"></div>
+              </div>
+              <div class="journey-dates">
+                <span>Ngày nhập ngũ: <b>08/09/2024</b></span>
+                <span>Ngày tốt nghiệp: <b>08/2028</b></span>
+              </div>
+              <div class="journey-metrics">
+                <div><strong id="journeyElapsed">0</strong><span>Ngày đã trải qua</span></div>
+                <div><strong id="journeyRemaining">0</strong><span>Ngày đến tốt nghiệp</span></div>
+              </div>
+              <p id="journeyMessage" class="muted"></p>
+              <p class="journey-note muted">Mốc tính: 01/08/2028 · Giờ thực tế từ máy chủ.</p>
+            </article>
+          <div id="journeyProgressRoot"></div>
+</section>
+          <section data-panel="smart-class" class="view" hidden><div id="smartClassRoot"></div></section>
+<section data-panel="leaderboard" class="view" hidden><div id="journeyLeaderboard"></div></section>
+<section data-panel="more" class="view" hidden aria-label="Tiện ích">
+            <div id="extrasRoot" class="extras-shell"></div>
+          </section>
+          <section data-panel="account" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">KHÔNG GIAN CÁ NHÂN</span>
+                <h1>Tài khoản</h1>
+                <p class="muted">Thông tin của bạn và tùy chọn bảo mật.</p>
+              </div>
+            </div>
+            <div class="account-grid">
+              <article class="panel profile">
+                <span class="avatar large" data-member-initials></span>
+                <h2 data-member-name></h2>
+                <p data-member-unit class="muted"></p>
+                <span id="accountRole" class="badge approved"></span>
+                <div class="action-row avatar-actions">
+                  <button id="avatarChoose" class="button soft small" type="button">Chọn ảnh đại diện</button>
+                  <button id="avatarRemove" class="button ghost small" type="button">Dùng ảnh mặc định</button>
+                </div>
+                <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+                <p class="muted"><small>PNG, JPEG, WebP · Cắt ảnh trước khi lưu.</small></p>
+                <hr />
+                <label class="field"
+                  ><span>Giao diện</span
+                  ><select id="themeSelect">
+                    <option value="system">Theo thiết bị</option>
+                    <option value="light">Sáng</option>
+                    <option value="dark">Tối</option>
+                  </select></label
+                >
+              </article>
+              <article class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Đổi mật khẩu</h2>
+                    <p>
+                      Sau khi đổi, các phiên trên thiết bị khác sẽ đăng xuất.
+                    </p>
+                  </div>
+                  <span class="surface-icon indigo" data-icon="shield"></span>
+                </div>
+                <form id="passwordForm" class="stack-form">
+                  <label class="field"
+                    ><span>Mật khẩu hiện tại</span
+                    ><input
+                      id="currentPassword"
+                      type="password"
+                      autocomplete="current-password"
+                      required
+                      maxlength="256" /></label
+                  ><label class="field"
+                    ><span>Mật khẩu mới</span
+                    ><input
+                      id="newPassword"
+                      type="password"
+                      autocomplete="new-password"
+                      minlength="8"
+                      maxlength="256"
+                      required
+                      placeholder="Ít nhất 8 ký tự" /></label
+                  ><label class="field"
+                    ><span>Xác nhận mật khẩu mới</span
+                    ><input
+                      id="confirmPassword"
+                      type="password"
+                      autocomplete="new-password"
+                      minlength="8"
+                      maxlength="256"
+                      required /></label
+                  ><button class="button primary" type="submit">
+                    Lưu mật khẩu mới
+                  </button>
+                  <p
+                    id="passwordMessage"
+                    class="inline-message"
+                    role="status"
+                  ></p>
+                </form>
+              </article>
+            </div>
+            <article id="passwordResetPanel" class="panel" data-reset-owner-only hidden style="margin-top: 24px">
+              <div class="panel-heading">
+                <div><h2>Đặt lại mật khẩu thành viên</h2>
+                  <p>Chỉ dành cho Châu Đan Huy. Thành viên phải đổi mật khẩu tạm khi đăng nhập.</p></div>
+                <span class="surface-icon indigo" data-icon="shield"></span>
+              </div>
+              <form id="passwordResetForm" class="stack-form">
+                <label class="field"><span>Thành viên cần hỗ trợ</span>
+                  <select id="resetMemberSelect" required disabled><option value="">Đang tải danh sách…</option></select>
+                </label>
+                <button id="resetPasswordButton" type="submit" class="button primary" disabled>Đặt lại mật khẩu</button>
+                <p id="resetPasswordMessage" class="inline-message" role="status"></p>
+              </form>
+              <div id="resetPasswordResult" class="stack-form" hidden>
+                <p id="resetPasswordTarget"></p>
+                <label class="field"><span>Mật khẩu tạm — sao chép và gửi riêng cho thành viên</span>
+                  <input id="resetTemporaryPassword" type="text" readonly autocomplete="off" spellcheck="false" aria-label="Mật khẩu tạm" />
+                </label>
+                <p class="muted">Mật khẩu chỉ được hiển thị trong lần đặt lại này. Sau khi đóng, bạn không thể xem lại.</p>
+                <div class="action-row">
+                  <button id="copyTemporaryPassword" class="button soft" type="button">Sao chép</button>
+                  <button id="dismissTemporaryPassword" class="button ghost" type="button">Đã lưu · Đóng</button>
+                </div>
+              </div>
+            </article>
+          </section>
+        </main>
+        <footer class="app-footer">
+          <span>ĐH31LQA · Đại đội 14</span><span>Cổng nội bộ <b>v5.0</b></span>
+        </footer>
+      </div>
+      <nav class="bottom-nav" aria-label="Điều hướng nhanh">
+        <button data-view="dashboard">
+          <span data-icon="grid"></span><span>Tổng quan</span></button
+        ><button data-view="tasks">
+          <span data-icon="check-square"></span><span>Nhiệm vụ</span></button
+        ><button data-view="submit">
+          <span data-icon="upload"></span><span>Gửi bài</span></button
+        ><button data-view="files">
+          <span data-icon="folder"></span><span>Tài liệu</span></button
+        ><button id="bottomMenu">
+          <span data-icon="menu"></span><span>Menu</span>
+        </button>
+      </nav>
+    </div>
+    <dialog id="actionDialog" class="modal" aria-labelledby="dialogTitle">
+      <form id="dialogForm">
+        <div class="modal-heading">
+          <span
+            id="dialogIcon"
+            class="surface-icon indigo"
+            data-icon="info"
+          ></span
+          ><button
+            class="icon-button"
+            type="button"
+            data-close="actionDialog"
+            aria-label="Đóng hộp thoại"
+          >
+            <span data-icon="x"></span>
+          </button>
+        </div>
+        <h2 id="dialogTitle"></h2>
+        <p id="dialogDescription" class="muted"></p>
+        <div id="dialogFields" class="stack-form"></div>
+        <p id="dialogError" class="inline-message error" role="status"></p>
+        <div class="modal-actions">
+          <button class="button soft" type="button" data-close="actionDialog">
+            Hủy</button
+          ><button id="dialogSubmit" class="button primary" type="submit">
+            Xác nhận
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      id="galleryDialog"
+      class="modal gallery-modal"
+      aria-labelledby="galleryTitle"
+    >
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">HỒ SƠ MINH CHỨNG</span>
+          <h2 id="galleryTitle"></h2>
+          <p id="galleryMeta"></p>
+        </div>
+        <button
+          class="icon-button"
+          data-close="galleryDialog"
+          aria-label="Đóng danh sách tệp"
+        >
+          <span data-icon="x"></span>
+        </button>
+      </div>
+      <div id="galleryFiles" class="file-grid"></div>
+    </dialog>
+    <dialog
+      id="previewDialog"
+      class="modal preview-modal"
+      aria-labelledby="previewTitle"
+    >
+      <div class="preview-top">
+        <div>
+          <h2 id="previewTitle"></h2>
+          <p id="previewMeta" class="muted"></p>
+        </div>
+        <button
+          class="icon-button"
+          data-close="previewDialog"
+          aria-label="Đóng xem trước"
+        >
+          <span data-icon="x"></span>
+        </button>
+      </div>
+      <div id="previewStage" class="preview-stage"></div>
+      <div class="preview-toolbar">
+        <div id="imageControls" class="action-row">
+          <button class="icon-button" id="zoomOut" aria-label="Thu nhỏ">
+            <span data-icon="minus"></span></button
+          ><button class="button ghost small" id="resetZoom">100%</button
+          ><button class="icon-button" id="zoomIn" aria-label="Phóng to">
+            <span data-icon="plus"></span></button
+          ><span class="toolbar-divider"></span
+          ><button class="icon-button" id="rotateImage" aria-label="Xoay ảnh">
+            <span data-icon="rotate"></span>
+          </button>
+        </div>
+        <a id="downloadFile" class="button primary small"
+          ><span data-icon="download"></span> Tải xuống</a
+        >
+      </div>
+    </dialog>
+    <div
+      id="toasts"
+      class="toast-container"
+      aria-live="polite"
+      aria-atomic="false"
+    ></div>
+    <noscript
+      ><p class="noscript">
+        Bạn cần bật JavaScript trong trình duyệt để dùng cổng nội bộ.
+      </p></noscript
+    >
+  </body>
+</html>

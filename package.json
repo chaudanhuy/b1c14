@@ -1,0 +1,29 @@
+{
+  "name": "b1c14-internal-portal",
+  "version": "5.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "build": "npm run sync:admin && wrangler pages functions build functions --outdir=.build",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "preview:qa": "node tests/preview.mjs",
+    "format": "prettier --write public functions tests/*.mjs",
+    "sync:admin": "node scripts/sync-admin.mjs",
+    "test:chat": "node --test tests/chat-worker.test.mjs",
+    "build:chat": "wrangler deploy --dry-run --config chat-worker/wrangler.jsonc --outdir=.build-chat",
+    "pack": "node scripts/package.mjs",
+    "build:smart": "wrangler deploy --dry-run --config smart-class-worker/wrangler.jsonc --outdir=.build-smart",
+    "test:smart": "node --test --test-concurrency=1 tests/smart-*.test.mjs"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6",
+    "wrangler": "^4.131.2",
+    "esbuild": "0.28.1",
+    "miniflare": "5.20260911.1-alpha"
+  }
+}

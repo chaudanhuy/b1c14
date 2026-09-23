@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS internal_mail (id TEXT PRIMARY KEY, sender_id INTEGER NOT NULL REFERENCES members(id), audience TEXT NOT NULL CHECK(audience IN ('person','all')), subject TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL, sent_deleted_at TEXT);
+CREATE TABLE IF NOT EXISTS internal_mail_recipients (mail_id TEXT NOT NULL REFERENCES internal_mail(id) ON DELETE CASCADE, member_id INTEGER NOT NULL REFERENCES members(id), read_at TEXT, deleted_at TEXT, PRIMARY KEY(mail_id, member_id));
+CREATE INDEX IF NOT EXISTS idx_mail_sender ON internal_mail(sender_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mail_recipient ON internal_mail_recipients(member_id, deleted_at, read_at);
+CREATE TABLE IF NOT EXISTS countdown_events (id TEXT PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES members(id), scope TEXT NOT NULL CHECK(scope IN ('private','all')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', target_at TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1);
+CREATE INDEX IF NOT EXISTS idx_events_scope ON countdown_events(scope, owner_id, target_at);
+CREATE TABLE IF NOT EXISTS announcements (id TEXT PRIMARY KEY, author_id INTEGER NOT NULL REFERENCES members(id), title TEXT NOT NULL, body TEXT NOT NULL, pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0,1)), created_at TEXT NOT NULL, updated_at TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1);
+CREATE INDEX IF NOT EXISTS idx_announcements_order ON announcements(pinned DESC, created_at DESC);
+CREATE TABLE IF NOT EXISTS announcement_reads (announcement_id TEXT NOT NULL REFERENCES announcements(id) ON DELETE CASCADE, member_id INTEGER NOT NULL REFERENCES members(id), revision INTEGER NOT NULL, read_at TEXT NOT NULL, PRIMARY KEY(announcement_id, member_id));

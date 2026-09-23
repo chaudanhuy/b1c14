@@ -1,0 +1,30 @@
+{
+  "name": "b1c14-lqa-chat",
+  "main": "index.js",
+  "compatibility_date": "2026-01-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "LQA_CHAT",
+        "class_name": "LqaChat"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "LqaChat"
+      ]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "activity-submission-db",
+      "database_id": "3266db5f-d83c-47ed-a145-3eb312dc88ea"
+    }
+  ]
+}
