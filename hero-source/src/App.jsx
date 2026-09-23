@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, ArrowRight, ChevronDown, Github, Twitter, Linkedin, Menu, X, Layers, Cpu, Palette } from 'lucide-react';
-import { useTypewriter } from './hooks/useTypewriter';
-import { RevealWords } from './components/RevealWords';
+import { ArrowRight, ChevronDown, Cpu, Github, Layers, Linkedin, Menu, Palette, Sparkles, Twitter, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Magnetic } from './components/Magnetic';
+import { RevealWords } from './components/RevealWords';
 import { TiltCard } from './components/TiltCard';
+import { useTypewriter } from './hooks/useTypewriter';
 import './styles/global.css';
 
 const PHRASES = [
-  'Designing the future.',
-  'Engineering elegance.',
-  'Crafting bold experiences.',
-  'Motion with intention.',
+  'Khám phá hệ sinh thái ĐH31LQA.',
+  'Hướng đến xây dựng Nhà trường thông minh.',
+  'Nền tảng số cho giáo dục.',
+  'Chinh phục những công nghệ mới.',
 ];
 
 export default function App() {
