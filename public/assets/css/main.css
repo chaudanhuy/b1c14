@@ -29,23 +29,23 @@
 :root {
   color-scheme: dark;
   --bg: #07070b;
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-2: rgba(255, 255, 255, 0.08);
-  --glass: rgba(7, 7, 11, 0.7);
+  --surface: #12121a;
+  --surface-2: #1c1c28;
+  --glass: rgba(7, 7, 11, 0.85);
   --ink: #ffffff;
   --muted: #a3a3a3;
-  --line: rgba(255, 255, 255, 0.1);
-  --primary: #06b6d4;
-  --primary-hover: #22d3ee;
+  --line: #2a2a35;
+  --primary: #7c3aed;
+  --primary-hover: #9333ea;
   --tint: rgba(124, 58, 237, 0.15);
-  --green: #34d399;
-  --green-bg: rgba(52, 211, 153, 0.15);
-  --amber: #fbbf24;
-  --amber-bg: rgba(251, 191, 36, 0.15);
-  --red: #f87171;
-  --red-bg: rgba(248, 113, 113, 0.15);
-  --blue: #38bdf8;
-  --blue-bg: rgba(56, 189, 248, 0.15);
+  --green: #10b981;
+  --green-bg: rgba(16, 185, 129, 0.15);
+  --amber: #f59e0b;
+  --amber-bg: rgba(245, 158, 11, 0.15);
+  --red: #ef4444;
+  --red-bg: rgba(239, 68, 68, 0.15);
+  --blue: #3b82f6;
+  --blue-bg: rgba(59, 130, 246, 0.15);
   --shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
   --radius: 18px;
   --sidebar-width: 254px;
@@ -238,8 +238,8 @@ hr {
 }
 .primary {
   background: var(--primary);
-  color: var(--surface);
-  box-shadow: 0 4px 10px #5558db1a;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.3);
 }
 .primary:hover {
   background: var(--primary-hover);
