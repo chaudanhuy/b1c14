@@ -402,25 +402,14 @@ function activate(member) {
   closeMenu(false);
 }
 async function loadRoster() {
-  $("#retryLogin").hidden = true;
-  $("#unitSelect").disabled = true;
+  const retryBtn = document.getElementById("retryLogin");
+  if (retryBtn) retryBtn.hidden = true;
   try {
     const data = await api("/api/roster");
     state.roster = data.groups || [];
-    $("#unitSelect").innerHTML =
-      '<option value="">Chọn tiểu đội / nhóm</option>' +
-      state.roster
-        .map((g) => `<option value="${h(g.code)}">${h(g.label)}</option>`)
-        .join("");
-    $("#unitSelect").disabled = false;
-    $("#memberSelect").innerHTML =
-      '<option value="">Chọn tiểu đội trước</option>';
-    $("#memberSelect").disabled = true;
     message("#loginMessage", "");
   } catch (error) {
-    $("#unitSelect").innerHTML =
-      '<option value="">Chưa tải được danh sách</option>';
-    $("#retryLogin").hidden = false;
+    if (retryBtn) retryBtn.hidden = false;
     message("#loginMessage", error.message, true);
   }
 }
