@@ -292,11 +292,12 @@ export function createSmartClass({api,getMember}){
     if(node&&s?.round){
       const seconds=Math.max(0,(s.round.deadline-(Date.now()+offset))/1000);
       node.textContent=s.phase==="QUESTION_ACTIVE"?seconds.toFixed(1)+" s":PHASES[s.phase];
-      if(!seconds&&s.phase==="QUESTION_ACTIVE"){
+      const finished=(!seconds||(s.round.count>0&&s.round.answered>=s.round.count));
+      if(finished&&s.phase==="QUESTION_ACTIVE"){
          root.querySelectorAll("#smartLive button,#smartLive input").forEach(n=>n.disabled=true);
          if(me()?.controlling&&bank.autoRun){
            if(!bank.autoNextTimeout){
-             bank.autoNextTimeout=setTimeout(()=>{send("LOCK_QUESTION");setTimeout(()=>send("SHOW_RESULT"),1500);},1000);
+             bank.autoNextTimeout=setTimeout(()=>{send("LOCK_QUESTION");setTimeout(()=>send("SHOW_RESULT"),150);},100);
            }
          }
       }
@@ -307,7 +308,7 @@ export function createSmartClass({api,getMember}){
           const q=bank.detail?.questions.find(x=>!(s?.usedQuestionIds||[]).includes(x.id));
           if(q)send("START_QUESTION",{question:{...q.question,bankId:q.id}});
           else{send("SHOW_LEADERBOARD");bank.autoRun=false;}
-        },6000);
+        },1500);
       }
     }else bank.autoResultTimeout=null;
     if(s?.phase!=="QUESTION_ACTIVE")bank.autoNextTimeout=null;

@@ -81,7 +81,7 @@ export function createCommunity({api,getMember}) {
       expiry=deadline;
       if(!messages.some(m=>m.id===message.id)){messages.push(message);messages.sort((a,b)=>a.seq-b.seq);renderMessages();}
     }
-    if(!duplicate&&notification&&message.recipient===me&&!((activeTab==='lqa-message'||dialog.open)&&!document.hidden&&windowFocused))notify(message,name||people.find(p=>p.id===other)?.name||'Thành viên',deadline);
+    if(!duplicate&&notification&&message.recipient===me&&!(activeTab==='lqa-message'||dialog.open))notify(message,name||people.find(p=>p.id===other)?.name||'Thành viên',deadline);
   }
   function expirePeer(id){
     expiries.delete(id);drafts.delete(id);
