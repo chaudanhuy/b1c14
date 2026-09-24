@@ -8,7 +8,7 @@ export function createSmartClass({api,getMember}){
   const root=document.getElementById("smartClassRoot");
   let ws=null,active=false,generation=0,heartbeat,reconnect,ticker,attempt=0,s=null,offset=0,lastPong=0;
   let liveKey="",order=[],left=null,wrongPair=null,previewAt=0,audioContext=null,sound=true,confettiFrame=0,celebrated="",lastRound="";
-  const bank={questions:[],sets:[],detail:null,loaded:false,loading:false,tab:"bank",search:"",mode:"",category:"",editing:null};
+  const bank={questions:[],sets:[],detail:null,loaded:false,loading:false,tab:"bank",search:"",mode:"",category:"",editing:null,autoRun:false,autoNextTimeout:null,autoResultTimeout:null};
   const pending=new Map();
   const allowed=()=>getMember()&&!getMember().must_change_password;
   const me=()=>s?.me;
@@ -147,7 +147,7 @@ export function createSmartClass({api,getMember}){
     if(bank.detail){
       const ids=bank.detail.questions.map(q=>q.id),available=bank.questions.filter(q=>!ids.includes(q.id));
       const next=bank.detail.questions.find(q=>!(s?.usedQuestionIds||[]).includes(q.id));
-      pane.innerHTML=`<div class="smart-bank-head"><div><button type="button" class="button ghost" data-smart="set-back">← Danh sách bộ đề</button><h3>${h(bank.detail.title)}</h3><p class="muted">${h(bank.detail.description||"Không có mô tả")}</p></div><div class="action-row">${btn("set-next","Bắt đầu câu tiếp theo","primary",!next||!canStart())}${btn("set-rename","Đổi tên","soft")}${btn("set-delete","Xóa bộ đề","ghost")}</div></div>
+      pane.innerHTML=`<div class="smart-bank-head"><div><button type="button" class="button ghost" data-smart="set-back">← Danh sách bộ đề</button><h3>${h(bank.detail.title)}</h3><p class="muted">${h(bank.detail.description||"Không có mô tả")}</p></div><div class="action-row">${btn("set-auto","Chạy tự động","primary",!next||!canStart())}${btn("set-next","Câu tiếp theo","soft",!next||!canStart())}${btn("set-rename","Đổi tên","soft")}${btn("set-delete","Xóa bộ đề","ghost")}</div></div>
         <div class="smart-set-add"><select id="smartSetAdd"><option value="">Chọn câu hỏi để thêm…</option>${available.map(q=>`<option value="${q.id}">${h(q.title)} · ${h(MODES[q.mode])}</option>`).join("")}</select>${btn("set-add","Thêm vào bộ đề","soft",!available.length)}</div>
         <div class="smart-set-list">${bank.detail.questions.length?bank.detail.questions.map((q,i)=>`<div class="smart-set-row"><b>${i+1}</b><div>${questionCard(q,true)}</div><div class="smart-set-order">${btn("set-up","↑","ghost",i===0)}${btn("set-down","↓","ghost",i===bank.detail.questions.length-1)}${btn("set-remove","Bỏ","ghost")}</div></div>`).join(""):'<p class="muted">Bộ đề chưa có câu hỏi. Chọn một câu ở phía trên để thêm.</p>'}</div>`;
       return;
@@ -292,8 +292,25 @@ export function createSmartClass({api,getMember}){
     if(node&&s?.round){
       const seconds=Math.max(0,(s.round.deadline-(Date.now()+offset))/1000);
       node.textContent=s.phase==="QUESTION_ACTIVE"?seconds.toFixed(1)+" s":PHASES[s.phase];
-      if(!seconds&&s.phase==="QUESTION_ACTIVE")root.querySelectorAll("#smartLive button,#smartLive input").forEach(n=>n.disabled=true);
+      if(!seconds&&s.phase==="QUESTION_ACTIVE"){
+         root.querySelectorAll("#smartLive button,#smartLive input").forEach(n=>n.disabled=true);
+         if(me()?.controlling&&bank.autoRun){
+           if(!bank.autoNextTimeout){
+             bank.autoNextTimeout=setTimeout(()=>{send("LOCK_QUESTION");setTimeout(()=>send("SHOW_RESULT"),1500);},1000);
+           }
+         }
+      }
     }
+    if(s?.phase==="SHOW_RESULT"&&me()?.controlling&&bank.autoRun){
+      if(!bank.autoResultTimeout){
+        bank.autoResultTimeout=setTimeout(()=>{
+          const q=bank.detail?.questions.find(x=>!(s?.usedQuestionIds||[]).includes(x.id));
+          if(q)send("START_QUESTION",{question:{...q.question,bankId:q.id}});
+          else{send("SHOW_LEADERBOARD");bank.autoRun=false;}
+        },6000);
+      }
+    }else bank.autoResultTimeout=null;
+    if(s?.phase!=="QUESTION_ACTIVE")bank.autoNextTimeout=null;
   }
   function confetti(container){
     if(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)return;
@@ -371,7 +388,7 @@ export function createSmartClass({api,getMember}){
     }else if(action==="set-delete"){const set=bank.detail;if(set&&await modal({title:"Xóa bộ đề?",description:"Câu hỏi trong ngân hàng không bị xóa.",submit:"Xóa",danger:true})){await api("/api/smart-class/question-sets?id="+encodeURIComponent(set.id),{method:"DELETE"});bank.detail=null;await loadBank(true);}}
     else if(action==="set-add"){const id=root.querySelector("#smartSetAdd")?.value;if(id&&bank.detail){const ids=[...bank.detail.questions.map(q=>q.id),id];await api("/api/smart-class/question-sets",{method:"PUT",body:{id:bank.detail.id,question_ids:ids}});bank.detail=(await api("/api/smart-class/question-sets?id="+encodeURIComponent(bank.detail.id))).set;renderSetsPane();}}
     else if(["set-up","set-down","set-remove"].includes(action)&&questionId&&bank.detail){let ids=bank.detail.questions.map(q=>q.id),i=ids.indexOf(questionId);if(action==="set-remove")ids.splice(i,1);else{const j=i+(action==="set-up"?-1:1);[ids[i],ids[j]]=[ids[j],ids[i]];}await api("/api/smart-class/question-sets",{method:"PUT",body:{id:bank.detail.id,question_ids:ids}});bank.detail=(await api("/api/smart-class/question-sets?id="+encodeURIComponent(bank.detail.id))).set;renderSetsPane();}
-    else if(action==="set-next"){const q=bank.detail?.questions.find(x=>!(s?.usedQuestionIds||[]).includes(x.id));if(q&&canStart())send("START_QUESTION",{question:{...q.question,bankId:q.id}});}
+    else if(action==="set-next"||action==="set-auto"){bank.autoRun=(action==="set-auto");const q=bank.detail?.questions.find(x=>!(s?.usedQuestionIds||[]).includes(x.id));if(q&&canStart())send("START_QUESTION",{question:{...q.question,bankId:q.id}});}
     else if(action==="claim")send("CLAIM_HOST");
     else if(action==="session"){
       const result=await modal({title:"Tạo phiên Smart Class",fields:field("title","Tên phiên","text","Smart Class","maxlength=120"),submit:"Tạo phiên",onSubmit:values=>values.title});

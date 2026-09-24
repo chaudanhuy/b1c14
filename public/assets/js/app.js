@@ -1190,7 +1190,7 @@ async function deleteTask() {
   });
   if (result) {
     metadataCache.clear();
-    toast(result.message);
+    toast(result?.message || "Đã xóa nhiệm vụ thành công.");
     await loadTasks();
     await loadManager();
   }
