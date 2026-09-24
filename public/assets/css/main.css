@@ -47,6 +47,9 @@
   --blue: #3b82f6;
   --blue-bg: rgba(59, 130, 246, 0.1);
   --shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+}
+
+:root {
   --radius: 18px;
   --sidebar-width: 254px;
 }
