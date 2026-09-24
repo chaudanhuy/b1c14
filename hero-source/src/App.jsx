@@ -86,17 +86,17 @@ export default function App() {
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-neutral-300">
             <a href="#reveal" className="hover:text-white transition-colors">
-              Approach
+              Kỷ luật
             </a>
             <a href="#features" className="hover:text-white transition-colors">
-              Craft
+              Đoàn kết
             </a>
             <a href="#contact" className="hover:text-white transition-colors">
               Contact
             </a>
           </div>
           <Magnetic onClick={() => window.location.href = '/app.html'} className="glow-hover hidden md:inline-flex items-center rounded-full bg-white text-black text-sm font-medium px-4 py-2">
-            Start a project
+            Bắt đầu khám phá
           </Magnetic>
           <button
             className="md:hidden text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 rounded-lg p-1"
@@ -109,10 +109,10 @@ export default function App() {
         {menuOpen && (
           <div className="md:hidden mx-1 mt-2 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-5 flex flex-col gap-4 text-sm text-neutral-200">
             <a href="#reveal" onClick={() => setMenuOpen(false)}>
-              Approach
+              Kỷ luật
             </a>
             <a href="#features" onClick={() => setMenuOpen(false)}>
-              Craft
+              Đoàn kết
             </a>
             <a href="#contact" onClick={() => setMenuOpen(false)}>
               Contact
@@ -142,8 +142,8 @@ export default function App() {
         </h1>
  
         <p className="mt-6 max-w-xl text-neutral-400 text-base md:text-lg leading-relaxed">
-          We're a small studio that designs and builds interfaces for teams who care how
-          the details feel, not just how they look.
+          Chào mừng bạn đến với hệ sinh thái ĐH31LQA, đây là nền tảng số phục vụ cho việc học tập, hướng đến 
+          mục tiêu xây dựng Xã hội số và Nhà trường thông minh. Nơi mà những ý tưởng không bao giờ có giới hạn!
         </p>
  
         <div className="mt-10 flex flex-col sm:flex-row items-center gap-5">
@@ -152,7 +152,7 @@ export default function App() {
             className="glow-hover-purple group relative inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-medium text-white"
             style={{ background: 'linear-gradient(90deg,#7c3aed,#06b6d4)' }}
           >
-            Start a project
+            Bắt đầu khám phá
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </Magnetic>
           <a
@@ -214,7 +214,7 @@ export default function App() {
           We reply within a day, with next steps — not a sales pitch.
         </p>
         <Magnetic onClick={() => window.location.href = '/app.html'} className="glow-hover inline-flex items-center rounded-full px-8 py-4 font-medium text-black bg-white">
-          Start a project
+          Bắt đầu khám phá
         </Magnetic>
       </section>
  
