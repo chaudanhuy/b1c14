@@ -27,18 +27,18 @@ export default function App() {
   const features = [
     {
       icon: Layers,
-      title: 'Systems that scale',
-      desc: 'Component libraries and design tokens built once, reused across every product surface without drifting apart.',
+      title: 'Hệ sinh thái đa tác vụ',
+      desc: 'Hoàn toàn có thể upload/download tài liệu, thống kê nhanh nhiệm vụ, mô hình Smart Class được xây dựng và phát triển đáp ứng mục tiêu Nhà Trường Thông Minh của Trường Sĩ quan Thông tin',
     },
     {
       icon: Cpu,
-      title: 'Sixty frames, always',
-      desc: 'We budget for performance the same way we budget for design — every animation is profiled before it ships.',
+      title: 'Số hóa môi trường làm việc',
+      desc: 'Ứng dụng khoa học hiện đại, công nghệ thông tin trên nền tảng Website, dễ dàng truy cập, thao tác và quản lý thông minh.',
     },
     {
       icon: Palette,
-      title: 'Detail, obsessively',
-      desc: 'Kerning, easing curves, corner radii — the parts nobody mentions are the parts people actually feel.',
+      title: 'Sắc thái riêng',
+      desc: 'Chúng tôi luôn xung phong đi đầu phong trào Chuyển Đổi Số Quốc Gia của đất nước và nhà trường, tạo nên điểm nhấn riêng của ĐH31LQA.',
     },
   ];
  
@@ -82,7 +82,7 @@ export default function App() {
         >
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-fuchsia-400" />
-            <span className="text-lg font-semibold tracking-tight">Aura</span>
+            <span className="text-lg font-semibold tracking-tight">Eco ĐH31LQA</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-neutral-300">
             <a href="#reveal" className="hover:text-white transition-colors">
@@ -180,10 +180,10 @@ export default function App() {
       <section id="features" className="relative px-6 py-24 md:py-32 max-w-6xl mx-auto">
         <div className="text-center mb-16 max-w-xl mx-auto">
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-            What makes it feel different
+            Chúng ta đã bước vào thời kỳ số hóa chưa nhỉ?
           </h2>
           <p className="mt-4 text-neutral-400 leading-relaxed">
-            Three commitments we don't compromise on, project after project.
+            Những điều mà ĐH31LQA đang muốn hướng đến đã gói gọn trong 3 mục tiêu sau
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
@@ -208,10 +208,10 @@ export default function App() {
       {/* Contact / CTA */}
       <section id="contact" className="relative px-6 py-28 md:py-36 max-w-4xl mx-auto text-center">
         <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6">
-          Tell us what you're building
+          Bạn đã sẵn sàng khám phá chưa?
         </h2>
         <p className="text-neutral-400 mb-10 max-w-lg mx-auto leading-relaxed">
-          We reply within a day, with next steps — not a sales pitch.
+          Trải nghiệm bất tận với những gì bạn chưa tưởng tượng đến — không chỉ là một trang web.
         </p>
         <Magnetic onClick={() => window.location.href = '/app.html'} className="glow-hover inline-flex items-center rounded-full px-8 py-4 font-medium text-black bg-white">
           Bắt đầu khám phá
@@ -222,7 +222,7 @@ export default function App() {
       <footer className="relative border-t border-white/10 px-6 py-10">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2 text-sm text-neutral-400">
-            <Sparkles className="w-4 h-4 text-fuchsia-400" /> Aura — © 2026
+            <Sparkles className="w-4 h-4 text-fuchsia-400" /> Ecosystem ĐH31LQA — © 2024 - 2028
           </div>
           <div className="flex items-center gap-5 text-neutral-400">
             <a href="#" className="hover:text-white transition-colors" aria-label="Github">
